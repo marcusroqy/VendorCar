@@ -1,26 +1,261 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ================================================
+   VENDORCARRO DESIGN SYSTEM
+   Premium Dark Theme
+   ================================================ */
+
+@theme {
+  /* ----------------------------------------
+     BRAND COLORS
+     ---------------------------------------- */
+     
+  /* Primary - Violeta */
+  --color-primary-50: oklch(0.97 0.02 285);
+  --color-primary-100: oklch(0.94 0.04 285);
+  --color-primary-200: oklch(0.88 0.08 285);
+  --color-primary-300: oklch(0.78 0.14 285);
+  --color-primary-400: oklch(0.68 0.18 280);
+  --color-primary-500: oklch(0.55 0.22 275);
+  --color-primary-600: oklch(0.48 0.22 275);
+  --color-primary-700: oklch(0.40 0.18 275);
+  --color-primary-800: oklch(0.34 0.14 275);
+  --color-primary-900: oklch(0.28 0.10 275);
+  
+  /* Secondary - Azul Elétrico */
+  --color-secondary-500: oklch(0.65 0.18 230);
+  
+  /* Accent - Dourado */
+  --color-accent-500: oklch(0.78 0.16 85);
+  
+  /* Success */
+  --color-success-50: oklch(0.97 0.02 150);
+  --color-success-500: oklch(0.55 0.16 150);
+  --color-success-600: oklch(0.48 0.14 150);
+  
+  /* Warning */
+  --color-warning-50: oklch(0.97 0.03 85);
+  --color-warning-500: oklch(0.72 0.18 60);
+  --color-warning-600: oklch(0.65 0.18 55);
+  
+  /* Error */
+  --color-error-50: oklch(0.97 0.02 25);
+  --color-error-500: oklch(0.60 0.22 25);
+  --color-error-600: oklch(0.52 0.20 25);
+  
+  /* Info */
+  --color-info-500: oklch(0.62 0.18 250);
+  
+  /* ----------------------------------------
+     NEUTRAL COLORS (Dark Theme)
+     ---------------------------------------- */
+  --color-gray-50: oklch(0.98 0 0);
+  --color-gray-100: oklch(0.96 0.005 285);
+  --color-gray-200: oklch(0.90 0.005 285);
+  --color-gray-300: oklch(0.84 0.005 285);
+  --color-gray-400: oklch(0.65 0.01 285);
+  --color-gray-500: oklch(0.50 0.01 285);
+  --color-gray-600: oklch(0.38 0.01 285);
+  --color-gray-700: oklch(0.30 0.01 285);
+  --color-gray-800: oklch(0.22 0.01 285);
+  --color-gray-900: oklch(0.16 0.01 285);
+  --color-gray-950: oklch(0.10 0.01 285);
+
+  /* ----------------------------------------
+     SEMANTIC TOKENS
+     ---------------------------------------- */
+  --color-background: var(--color-gray-950);
+  --color-background-elevated: var(--color-gray-900);
+  --color-background-muted: var(--color-gray-800);
+  
+  --color-foreground: var(--color-gray-50);
+  --color-foreground-muted: var(--color-gray-400);
+  --color-foreground-subtle: var(--color-gray-500);
+  
+  --color-border: var(--color-gray-800);
+  --color-border-hover: var(--color-gray-700);
+  
+  --color-ring: var(--color-primary-500);
+  
+  /* Card */
+  --color-card: var(--color-gray-900);
+  --color-card-foreground: var(--color-gray-50);
+  
+  /* Destructive */
+  --color-destructive: var(--color-error-500);
+  --color-destructive-foreground: var(--color-gray-50);
+  
+  /* WhatsApp */
+  --color-whatsapp: oklch(0.62 0.18 150);
+  --color-whatsapp-foreground: oklch(1 0 0);
+
+  /* ----------------------------------------
+     TYPOGRAPHY
+     ---------------------------------------- */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* ----------------------------------------
+     SPACING
+     ---------------------------------------- */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* ================================================
+   BASE STYLES
+   ================================================ */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    @apply scroll-smooth antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  
+  /* Focus visible */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+  
+  /* Selection */
+  ::selection {
+    @apply bg-primary-500/30 text-foreground;
+  }
+  
+  /* Scrollbar (WebKit) */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-700 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-600;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ================================================
+   UTILITIES
+   ================================================ */
+
+@layer utilities {
+  /* Glassmorphism */
+  .glass {
+    @apply bg-gray-900/60 backdrop-blur-xl border border-white/10;
+  }
+  
+  /* Text gradient */
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary-400 to-secondary-500 bg-clip-text text-transparent;
+  }
+  
+  /* Glow effects */
+  .glow-primary {
+    box-shadow: 0 0 20px oklch(0.55 0.22 275 / 0.3);
+  }
+  
+  .glow-success {
+    box-shadow: 0 0 20px oklch(0.55 0.16 150 / 0.3);
+  }
+  
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Touch optimization */
+  .touch-target {
+    @apply min-h-11 min-w-11;
+  }
+  
+  /* Shimmer animation for skeletons */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--color-gray-800) 0%,
+      var(--color-gray-700) 50%,
+      var(--color-gray-800) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+  
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+  
+  /* Fade in up animation */
+  .animate-fade-in-up {
+    animation: fadeInUp 0.3s ease-out;
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Scale in animation */
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+  
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
+/* ================================================
+   REDUCED MOTION
+   ================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VendorCarro 🚗
 
-## Getting Started
+Plataforma SaaS para vendedores de veículos gerenciarem estoque, leads e vendas.
 
-First, run the development server:
+![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
+![Supabase](https://img.shields.io/badge/Supabase-Database-green?logo=supabase)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss)
+
+## ✨ Features
+
+- 🚘 **Gestão de Veículos** - Cadastre com fotos, preços e status
+- 👥 **Controle de Leads** - Acompanhe interessados e negociações
+- 🔗 **Links Compartilháveis** - Cada veículo gera um link único
+- 📱 **Mobile-First** - Funciona perfeitamente no celular
+- 🔐 **Autenticação** - Login com Google ou Magic Link
+- 💳 **Freemium** - Grátis até 3 veículos, PRO ilimitado
+
+## 🛠️ Tech Stack
+
+- **Frontend**: Next.js 16, React 19, TypeScript
+- **Styling**: Tailwind CSS 4, Framer Motion
+- **Database**: Supabase (PostgreSQL)
+- **Auth**: Supabase Auth (Google OAuth, Magic Link)
+- **State**: React Query, Zustand
+- **Forms**: React Hook Form, Zod
+
+## 🚀 Getting Started
+
+### Pré-requisitos
+
+- Node.js 20+
+- npm ou pnpm
+- Conta no [Supabase](https://supabase.com)
+
+### Instalação
 
 ```bash
+# Clone o repositório
+git clone https://github.com/SEU_USUARIO/vendorcarro.git
+cd vendorcarro
+
+# Instale as dependências
+npm install
+
+# Configure as variáveis de ambiente
+cp .env.example .env.local
+# Edite .env.local com suas credenciais do Supabase
+
+# Rode o projeto
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Variáveis de Ambiente
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-anon-key
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📁 Estrutura do Projeto
 
-## Learn More
+```
+src/
+├── app/                    # App Router (Next.js 16)
+│   ├── (auth)/            # Rotas de autenticação
+│   ├── (dashboard)/       # Área logada
+│   └── page.tsx           # Landing page
+├── components/
+│   ├── ui/                # Componentes base (Button, Card, Input...)
+│   ├── layout/            # Layout (Sidebar, Header...)
+│   └── providers/         # Context providers
+├── features/              # Módulos por feature
+│   ├── vehicles/          # CRUD de veículos
+│   ├── leads/             # Gestão de leads
+│   └── auth/              # Autenticação
+├── lib/
+│   ├── supabase/          # Clientes Supabase
+│   └── utils/             # Funções utilitárias
+└── types/                 # TypeScript types
+```
 
-To learn more about Next.js, take a look at the following resources:
+## 🎨 Design System
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Premium Dark Theme
+- Glassmorphism sutil
+- Micro-animações
+- Touch-optimized (44px+ targets)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📄 License
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT © 2026 VendorCarro
