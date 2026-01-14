@@ -9,5 +9,11 @@ export function createClient() {
         return null;
     }
 
-    return createBrowserClient(supabaseUrl, supabaseAnonKey);
+    return createBrowserClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+            persistSession: true,
+            storageKey: 'vendorcarro-auth',
+            storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+        },
+    });
 }
