@@ -68,6 +68,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 <Link
                                     key={item.href}
                                     href={item.href}
+                                    prefetch={true}
                                     className={cn(
                                         'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
                                         isActive
@@ -142,6 +143,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 <Link
                                     key={item.href}
                                     href={item.href}
+                                    prefetch={true}
                                     onClick={() => setIsMobileMenuOpen(false)}
                                     className={cn(
                                         'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
@@ -176,6 +178,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <Link
                                 key={item.href}
                                 href={item.href}
+                                prefetch={true}
                                 className={cn(
                                     'flex flex-col items-center gap-1 px-4 py-2',
                                     isActive ? 'text-primary-400' : 'text-foreground-muted'
