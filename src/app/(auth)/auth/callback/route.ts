@@ -14,11 +14,7 @@ export async function GET(request: Request) {
             const { error } = await supabase.auth.exchangeCodeForSession(code);
 
             if (!error) {
-                // If new signup, redirect to onboarding
-                if (type === 'signup') {
-                    return NextResponse.redirect(`${origin}/onboarding`);
-                }
-
+                // Redirect to dashboard or specified redirectTo
                 return NextResponse.redirect(`${origin}${redirectTo}`);
             }
         }
