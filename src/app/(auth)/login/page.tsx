@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Car, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
@@ -19,7 +19,7 @@ function GoogleIcon({ className }: { className?: string }) {
     );
 }
 
-export default function LoginPage() {
+function LoginForm() {
     const searchParams = useSearchParams();
     const redirectTo = searchParams.get('redirectTo') || '/dashboard';
 
@@ -207,5 +207,13 @@ export default function LoginPage() {
                 </Link>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div></div>}>
+            <LoginForm />
+        </Suspense>
     );
 }
