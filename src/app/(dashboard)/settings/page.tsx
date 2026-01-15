@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { User, CreditCard, LogOut, Users, Mail, Crown, Shield, UserCheck, Copy, X, Loader2, Trash2, Save, Check, Plus, Clock, AlertCircle, Zap, Edit2, Car, Calculator, Briefcase, Camera } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui';
 import { createClient } from '@/lib/supabase/client';
@@ -27,9 +27,16 @@ const planLabels: Record<string, { name: string; members: number }> = {
 export default function SettingsPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const initialTab = (searchParams.get('tab') as TabType) || 'profile';
-    const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+    const [activeTab, setActiveTab] = useState<TabType>('profile');
     const [isLoading, setIsLoading] = useState(false);
+
+    // Sync tab with URL on mount and when searchParams change
+    useEffect(() => {
+        const tabFromUrl = searchParams.get('tab') as TabType;
+        if (tabFromUrl && ['profile', 'team', 'subscription'].includes(tabFromUrl)) {
+            setActiveTab(tabFromUrl);
+        }
+    }, [searchParams]);
 
     // Update URL when tab changes
     const handleTabChange = (tab: TabType) => {
