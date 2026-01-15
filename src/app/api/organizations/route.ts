@@ -50,9 +50,29 @@ export async function GET() {
                 id,
                 user_id,
                 role,
-                joined_at
+                joined_at,
+                display_name
             `)
             .eq('organization_id', orgId);
+
+        // Fetch user profiles for all members
+        const memberUserIds = members?.map(m => m.user_id) || [];
+        const { data: profiles } = await supabase
+            .from('user_profiles')
+            .select('id, name, avatar_url')
+            .in('id', memberUserIds);
+
+        // Merge profile data into members
+        const membersWithProfiles = members?.map(member => {
+            const profile = profiles?.find(p => p.id === member.user_id);
+            return {
+                ...member,
+                user: {
+                    name: profile?.name || null,
+                    avatar_url: profile?.avatar_url || null,
+                }
+            };
+        }) || [];
 
         // Get pending invites
         const { data: invites } = await supabase
@@ -64,7 +84,7 @@ export async function GET() {
         return NextResponse.json({
             organization: org,
             role: membership.role,
-            members: members || [],
+            members: membersWithProfiles,
             invites: invites || [],
         });
     } catch {

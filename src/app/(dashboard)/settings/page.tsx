@@ -323,7 +323,7 @@ function SettingsContent() {
 
     const handleEditMember = (member: OrganizationMember) => {
         setEditingMemberId(member.id);
-        setEditingMemberName(member.display_name || member.user?.email?.split('@')[0] || '');
+        setEditingMemberName(member.display_name || member.user?.name || '');
     };
 
     const handleSaveMemberName = async () => {
@@ -646,8 +646,12 @@ function SettingsContent() {
                                                     <tr key={member.id} className="group hover:bg-gray-700/20 transition-colors">
                                                         <td className="py-3 px-4">
                                                             <div className="flex items-center gap-3">
-                                                                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors[index % colors.length]} flex items-center justify-center text-white font-semibold shadow-lg`}>
-                                                                    {(member.display_name || member.user?.email || '?').charAt(0).toUpperCase()}
+                                                                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors[index % colors.length]} flex items-center justify-center text-white font-semibold shadow-lg overflow-hidden`}>
+                                                                    {member.user?.avatar_url ? (
+                                                                        <img src={member.user.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        (member.display_name || member.user?.name || '?').charAt(0).toUpperCase()
+                                                                    )}
                                                                 </div>
                                                                 <div className="flex-1">
                                                                     {editingMemberId === member.id ? (
@@ -680,7 +684,7 @@ function SettingsContent() {
                                                                     ) : (
                                                                         <div className="flex items-center gap-2">
                                                                             <p className="font-medium text-foreground">
-                                                                                {member.display_name || member.user?.email?.split('@')[0] || 'Usuário'}
+                                                                                {member.display_name || member.user?.name || 'Usuário'}
                                                                             </p>
                                                                             <button
                                                                                 onClick={() => handleEditMember(member)}
@@ -690,7 +694,6 @@ function SettingsContent() {
                                                                             </button>
                                                                         </div>
                                                                     )}
-                                                                    <p className="text-sm text-foreground-muted">{member.user?.email}</p>
                                                                 </div>
                                                             </div>
                                                         </td>

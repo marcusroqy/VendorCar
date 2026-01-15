@@ -27,10 +27,12 @@ export interface OrganizationMember {
     display_name?: string;
     invited_by?: string;
     joined_at: string;
-    // Joined data
+    // Joined data from user_profiles
     user?: {
-        id: string;
-        email: string;
+        id?: string;
+        email?: string;
+        name?: string;
+        avatar_url?: string;
     };
 }
 
