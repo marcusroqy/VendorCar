@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, CreditCard, LogOut, Users, Mail, Crown, Shield, UserCheck, Copy, X, Loader2, Trash2 } from 'lucide-react';
+import { User, CreditCard, LogOut, Users, Mail, Crown, Shield, UserCheck, Copy, X, Loader2, Trash2, Save, Check } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -41,6 +41,41 @@ export default function SettingsPage() {
     const [inviteSuccess, setInviteSuccess] = useState('');
     const [inviteLink, setInviteLink] = useState('');
 
+    // Profile state
+    const [profileName, setProfileName] = useState('');
+    const [profilePhone, setProfilePhone] = useState('');
+    const [userEmail, setUserEmail] = useState('');
+    const [savingProfile, setSavingProfile] = useState(false);
+    const [profileSaved, setProfileSaved] = useState(false);
+    const [loadingProfile, setLoadingProfile] = useState(true);
+
+    // Fetch user profile
+    useEffect(() => {
+        async function fetchProfile() {
+            const supabase = createClient();
+            if (!supabase) return;
+
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setUserEmail(user.email || '');
+
+                // Fetch profile from user_profiles table
+                const { data: profile } = await supabase
+                    .from('user_profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single();
+
+                if (profile) {
+                    setProfileName(profile.name || '');
+                    setProfilePhone(profile.phone || '');
+                }
+            }
+            setLoadingProfile(false);
+        }
+        fetchProfile();
+    }, []);
+
     // Fetch organization data
     useEffect(() => {
         async function fetchOrg() {
@@ -61,6 +96,38 @@ export default function SettingsPage() {
         }
         fetchOrg();
     }, []);
+
+    const handleSaveProfile = async () => {
+        setSavingProfile(true);
+        setProfileSaved(false);
+
+        const supabase = createClient();
+        if (!supabase) {
+            setSavingProfile(false);
+            return;
+        }
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            setSavingProfile(false);
+            return;
+        }
+
+        const { error } = await supabase
+            .from('user_profiles')
+            .upsert({
+                id: user.id,
+                name: profileName,
+                phone: profilePhone,
+                updated_at: new Date().toISOString(),
+            });
+
+        if (!error) {
+            setProfileSaved(true);
+            setTimeout(() => setProfileSaved(false), 2000);
+        }
+        setSavingProfile(false);
+    };
 
     const handleSignOut = async () => {
         setIsLoading(true);
@@ -165,8 +232,8 @@ export default function SettingsPage() {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${activeTab === tab.id
-                                ? 'bg-primary-500/20 text-primary-400'
-                                : 'text-foreground-muted hover:text-foreground hover:bg-gray-800/50'
+                            ? 'bg-primary-500/20 text-primary-400'
+                            : 'text-foreground-muted hover:text-foreground hover:bg-gray-800/50'
                             }`}
                     >
                         <tab.icon className="w-4 h-4" />
@@ -186,12 +253,44 @@ export default function SettingsPage() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <Input label="Nome" placeholder="Seu nome" disabled />
-                            <Input label="Email" type="email" placeholder="seu@email.com" disabled />
-                            <Input label="WhatsApp" placeholder="(11) 99999-9999" disabled />
-                            <p className="text-sm text-foreground-muted">
-                                Edição de perfil disponível em breve.
-                            </p>
+                            {loadingProfile ? (
+                                <div className="flex justify-center py-4">
+                                    <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
+                                </div>
+                            ) : (
+                                <>
+                                    <Input
+                                        label="Nome"
+                                        placeholder="Seu nome"
+                                        value={profileName}
+                                        onChange={(e) => setProfileName(e.target.value)}
+                                    />
+                                    <Input
+                                        label="Email"
+                                        type="email"
+                                        value={userEmail}
+                                        disabled
+                                        className="opacity-60"
+                                    />
+                                    <p className="text-xs text-foreground-muted -mt-2">
+                                        O email não pode ser alterado
+                                    </p>
+                                    <Input
+                                        label="WhatsApp"
+                                        placeholder="(11) 99999-9999"
+                                        value={profilePhone}
+                                        onChange={(e) => setProfilePhone(e.target.value)}
+                                    />
+                                    <Button
+                                        onClick={handleSaveProfile}
+                                        isLoading={savingProfile}
+                                        leftIcon={profileSaved ? <Check className="w-5 h-5" /> : <Save className="w-5 h-5" />}
+                                        variant={profileSaved ? "secondary" : "primary"}
+                                    >
+                                        {profileSaved ? 'Salvo!' : 'Salvar Alterações'}
+                                    </Button>
+                                </>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -443,8 +542,8 @@ export default function SettingsPage() {
                                 <div
                                     key={tier.plan}
                                     className={`p-4 rounded-xl border ${organization?.plan === tier.plan
-                                            ? 'border-primary-500 bg-primary-500/10'
-                                            : 'border-gray-700'
+                                        ? 'border-primary-500 bg-primary-500/10'
+                                        : 'border-gray-700'
                                         }`}
                                 >
                                     <p className="font-semibold capitalize">{tier.plan}</p>
