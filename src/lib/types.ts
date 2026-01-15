@@ -12,6 +12,7 @@ export interface Organization {
     name: string;
     slug: string;
     owner_id: string;
+    logo_url?: string;
     max_members: number;
     plan: OrganizationPlan;
     created_at: string;

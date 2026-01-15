@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { User, CreditCard, LogOut, Users, Mail, Crown, Shield, UserCheck, Copy, X, Loader2, Trash2, Save, Check, Plus, Clock, AlertCircle, Zap, Edit2, Car, Calculator, Briefcase } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { User, CreditCard, LogOut, Users, Mail, Crown, Shield, UserCheck, Copy, X, Loader2, Trash2, Save, Check, Plus, Clock, AlertCircle, Zap, Edit2, Car, Calculator, Briefcase, Camera } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -57,6 +57,15 @@ export default function SettingsPage() {
     const [editingMemberName, setEditingMemberName] = useState('');
     const [savingMember, setSavingMember] = useState(false);
 
+    // Avatar/Logo state
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [logoUrl, setLogoUrl] = useState<string | null>(null);
+    const [uploadingAvatar, setUploadingAvatar] = useState(false);
+    const [uploadingLogo, setUploadingLogo] = useState(false);
+    const [userId, setUserId] = useState<string | null>(null);
+    const avatarInputRef = useRef<HTMLInputElement>(null);
+    const logoInputRef = useRef<HTMLInputElement>(null);
+
     // Fetch user profile
     useEffect(() => {
         async function fetchProfile() {
@@ -66,6 +75,7 @@ export default function SettingsPage() {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 setUserEmail(user.email || '');
+                setUserId(user.id);
 
                 // Fetch profile from user_profiles table
                 const { data: profile } = await supabase
@@ -77,6 +87,7 @@ export default function SettingsPage() {
                 if (profile) {
                     setProfileName(profile.name || '');
                     setProfilePhone(profile.phone || '');
+                    setAvatarUrl(profile.avatar_url || null);
                 }
             }
             setLoadingProfile(false);
@@ -145,6 +156,90 @@ export default function SettingsPage() {
             router.push('/');
         }
         setIsLoading(false);
+    };
+
+    const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !userId) return;
+
+        setUploadingAvatar(true);
+        const supabase = createClient();
+        if (!supabase) {
+            setUploadingAvatar(false);
+            return;
+        }
+
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${userId}/${Date.now()}.${fileExt}`;
+
+        // Upload to storage
+        const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(filePath, file, { upsert: true });
+
+        if (uploadError) {
+            console.error('Upload error:', uploadError);
+            setUploadingAvatar(false);
+            return;
+        }
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(filePath);
+
+        // Update profile
+        await supabase
+            .from('user_profiles')
+            .upsert({
+                id: userId,
+                avatar_url: publicUrl,
+                updated_at: new Date().toISOString(),
+            });
+
+        setAvatarUrl(publicUrl);
+        setUploadingAvatar(false);
+    };
+
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !organization) return;
+
+        setUploadingLogo(true);
+        const supabase = createClient();
+        if (!supabase) {
+            setUploadingLogo(false);
+            return;
+        }
+
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${organization.id}/${Date.now()}.${fileExt}`;
+
+        // Upload to storage
+        const { error: uploadError } = await supabase.storage
+            .from('logos')
+            .upload(filePath, file, { upsert: true });
+
+        if (uploadError) {
+            console.error('Logo upload error:', uploadError);
+            setUploadingLogo(false);
+            return;
+        }
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('logos')
+            .getPublicUrl(filePath);
+
+        // Update organization
+        await supabase
+            .from('organizations')
+            .update({ logo_url: publicUrl })
+            .eq('id', organization.id);
+
+        setLogoUrl(publicUrl);
+        setOrganization({ ...organization, logo_url: publicUrl });
+        setUploadingLogo(false);
     };
 
     const handleInvite = async (e: React.FormEvent) => {
@@ -304,6 +399,44 @@ export default function SettingsPage() {
                                 </div>
                             ) : (
                                 <>
+                                    {/* Avatar Upload */}
+                                    <div className="flex items-center gap-6 pb-4 border-b border-gray-700/50">
+                                        <div className="relative group">
+                                            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center overflow-hidden shadow-lg">
+                                                {avatarUrl ? (
+                                                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span className="text-2xl font-bold text-white">
+                                                        {profileName?.charAt(0)?.toUpperCase() || userEmail?.charAt(0)?.toUpperCase() || '?'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => avatarInputRef.current?.click()}
+                                                disabled={uploadingAvatar}
+                                                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl"
+                                            >
+                                                {uploadingAvatar ? (
+                                                    <Loader2 className="w-6 h-6 animate-spin text-white" />
+                                                ) : (
+                                                    <Camera className="w-6 h-6 text-white" />
+                                                )}
+                                            </button>
+                                            <input
+                                                ref={avatarInputRef}
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleAvatarUpload}
+                                                className="hidden"
+                                            />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-foreground">Foto do Perfil</p>
+                                            <p className="text-sm text-foreground-muted">Clique para alterar sua foto</p>
+                                            <p className="text-xs text-foreground-muted mt-1">JPG, PNG ou GIF. Max 2MB</p>
+                                        </div>
+                                    </div>
+
                                     <Input
                                         label="Nome"
                                         placeholder="Seu nome"
@@ -372,13 +505,36 @@ export default function SettingsPage() {
                                 <div className="relative p-6">
                                     <div className="flex items-start justify-between">
                                         <div className="flex items-center gap-4">
-                                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/25">
-                                                <Users className="w-7 h-7 text-white" />
+                                            {/* Logo Upload */}
+                                            <div className="relative group cursor-pointer" onClick={() => canManageMembers && logoInputRef.current?.click()}>
+                                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/25 overflow-hidden">
+                                                    {organization.logo_url || logoUrl ? (
+                                                        <img src={organization.logo_url || logoUrl || ''} alt="Logo" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <Users className="w-7 h-7 text-white" />
+                                                    )}
+                                                </div>
+                                                {canManageMembers && (
+                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl">
+                                                        {uploadingLogo ? (
+                                                            <Loader2 className="w-5 h-5 animate-spin text-white" />
+                                                        ) : (
+                                                            <Camera className="w-5 h-5 text-white" />
+                                                        )}
+                                                    </div>
+                                                )}
+                                                <input
+                                                    ref={logoInputRef}
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={handleLogoUpload}
+                                                    className="hidden"
+                                                />
                                             </div>
                                             <div>
                                                 <h2 className="text-xl font-bold text-foreground">{organization.name}</h2>
                                                 <p className="text-sm text-foreground-muted">
-                                                    Gerencie sua equipe e permissões
+                                                    {canManageMembers ? 'Clique na logo para alterar' : 'Gerencie sua equipe e permissões'}
                                                 </p>
                                             </div>
                                         </div>
@@ -513,16 +669,16 @@ export default function SettingsPage() {
                                                         </td>
                                                         <td className="py-3 px-4">
                                                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${roleLabels[member.role]?.color === 'amber'
-                                                                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                                                    : roleLabels[member.role]?.color === 'purple'
-                                                                        ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-                                                                        : roleLabels[member.role]?.color === 'blue'
-                                                                            ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                                                                            : roleLabels[member.role]?.color === 'green'
-                                                                                ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                                                                                : roleLabels[member.role]?.color === 'cyan'
-                                                                                    ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
-                                                                                    : 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+                                                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                                                : roleLabels[member.role]?.color === 'purple'
+                                                                    ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                                                                    : roleLabels[member.role]?.color === 'blue'
+                                                                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                                                        : roleLabels[member.role]?.color === 'green'
+                                                                            ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                                                                            : roleLabels[member.role]?.color === 'cyan'
+                                                                                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                                                                                : 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
                                                                 }`}>
                                                                 <RoleIcon className="w-3.5 h-3.5" />
                                                                 {roleLabels[member.role]?.label}
