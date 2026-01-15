@@ -24,28 +24,32 @@ const planLabels: Record<string, { name: string; members: number }> = {
     business: { name: 'Business', members: 999 },
 };
 
-export default function SettingsPage() {
+// Inner component that uses useSearchParams
+function SettingsContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const [activeTab, setActiveTab] = useState<TabType>('profile');
+    const [activeTab, setActiveTab] = useState<TabType>(() => {
+        // Initialize from localStorage on client
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('settings_tab') as TabType;
+            if (saved && ['profile', 'team', 'subscription'].includes(saved)) {
+                return saved;
+            }
+        }
+        return 'profile';
+    });
     const [isLoading, setIsLoading] = useState(false);
-    const [tabLoaded, setTabLoaded] = useState(false);
 
-    // Load tab from URL or localStorage on mount
+    // Sync tab with URL on mount
     useEffect(() => {
         const tabFromUrl = searchParams.get('tab') as TabType;
-        const savedTab = typeof window !== 'undefined' ? localStorage.getItem('settings_tab') as TabType : null;
-
         if (tabFromUrl && ['profile', 'team', 'subscription'].includes(tabFromUrl)) {
             setActiveTab(tabFromUrl);
             localStorage.setItem('settings_tab', tabFromUrl);
-        } else if (savedTab && ['profile', 'team', 'subscription'].includes(savedTab)) {
-            setActiveTab(savedTab);
         }
-        setTabLoaded(true);
     }, [searchParams]);
 
-    // Update localStorage when tab changes
+    // Update localStorage and URL when tab changes
     const handleTabChange = (tab: TabType) => {
         setActiveTab(tab);
         localStorage.setItem('settings_tab', tab);
@@ -957,5 +961,18 @@ export default function SettingsPage() {
                 </Card>
             )}
         </div >
+    );
+}
+
+// Wrapper with Suspense for useSearchParams
+export default function SettingsPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+            </div>
+        }>
+            <SettingsContent />
+        </Suspense>
     );
 }
