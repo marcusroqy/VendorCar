@@ -66,8 +66,23 @@ export default function DashboardPage() {
             try {
                 // Get user info
                 const { data: { user } } = await supabase.auth.getUser();
-                if (user?.email) {
-                    setUserName(user.email.split('@')[0]);
+                if (user) {
+                    console.log('User ID:', user.id);
+
+                    // Try to get name from profile first
+                    const { data: profile, error: profileError } = await supabase
+                        .from('user_profiles')
+                        .select('name')
+                        .eq('id', user.id)
+                        .single();
+
+                    console.log('Profile data:', profile, 'Error:', profileError);
+
+                    if (profile?.name) {
+                        setUserName(profile.name);
+                    } else if (user.email) {
+                        setUserName(user.email.split('@')[0]);
+                    }
                 }
 
                 // Fetch vehicles
