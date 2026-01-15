@@ -130,6 +130,7 @@ function SettingsContent() {
                 if (res.ok) {
                     const data = await res.json();
                     setOrganization(data.organization);
+                    setLogoUrl(data.organization?.logo_url || null);
                     setMembers(data.members || []);
                     setInvites(data.invites || []);
                     setMyRole(data.role);
