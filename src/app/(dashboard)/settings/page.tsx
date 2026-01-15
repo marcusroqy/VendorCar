@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { User, CreditCard, LogOut, Users, Mail, Crown, Shield, UserCheck, Copy, X, Loader2, Trash2, Save, Check, Plus, Clock, AlertCircle, Zap, Edit2, Car, Calculator, Briefcase, Camera } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Organization, OrganizationMember, OrganizationInvite, OrganizationRole } from '@/lib/types';
 
 type TabType = 'profile' | 'team' | 'subscription';
@@ -26,8 +26,16 @@ const planLabels: Record<string, { name: string; members: number }> = {
 
 export default function SettingsPage() {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<TabType>('profile');
+    const searchParams = useSearchParams();
+    const initialTab = (searchParams.get('tab') as TabType) || 'profile';
+    const [activeTab, setActiveTab] = useState<TabType>(initialTab);
     const [isLoading, setIsLoading] = useState(false);
+
+    // Update URL when tab changes
+    const handleTabChange = (tab: TabType) => {
+        setActiveTab(tab);
+        router.replace(`/settings?tab=${tab}`, { scroll: false });
+    };
 
     // Organization state
     const [organization, setOrganization] = useState<Organization | null>(null);
@@ -370,7 +378,7 @@ export default function SettingsPage() {
                 {tabs.map(tab => (
                     <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
+                        onClick={() => handleTabChange(tab.id)}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${activeTab === tab.id
                             ? 'bg-primary-500/20 text-primary-400'
                             : 'text-foreground-muted hover:text-foreground hover:bg-gray-800/50'
@@ -863,7 +871,7 @@ export default function SettingsPage() {
                                             </div>
                                         </div>
                                         <Button
-                                            onClick={() => setActiveTab('subscription')}
+                                            onClick={() => handleTabChange('subscription')}
                                             className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
                                         >
                                             Ver Planos
