@@ -514,7 +514,7 @@ export default function VehicleDetailPage() {
                         <CardContent className="p-4">
                             <h3 className="text-sm font-medium text-foreground-muted mb-3">Ações Rápidas</h3>
                             <div className="space-y-2">
-                                <Link href="/sales/new" className="block">
+                                <Link href={`/sales/new?vehicleId=${vehicleId}`} className="block">
                                     <Button variant="secondary" fullWidth size="sm" leftIcon={<ShoppingCart className="w-4 h-4" />}>
                                         Registrar Venda
                                     </Button>

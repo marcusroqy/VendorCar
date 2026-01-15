@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
     ArrowLeft,
@@ -57,8 +57,11 @@ const paymentMethods = [
     { value: 'trade_plus_cash', label: 'Troca + Dinheiro', icon: '🔄💵' },
 ];
 
-export default function NewSalePage() {
+function NewSaleForm() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const vehicleIdParam = searchParams.get('vehicleId');
+
     const leadSearchRef = useRef<HTMLDivElement>(null);
     const vehicleSearchRef = useRef<HTMLDivElement>(null);
 
@@ -90,6 +93,13 @@ export default function NewSalePage() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    // Format price helper
+    const formatPrice = (value: string | number) => {
+        const numbers = String(value).replace(/\D/g, '');
+        const formatted = new Intl.NumberFormat('pt-BR').format(Number(numbers));
+        return formatted;
+    };
+
     // Fetch leads and vehicles on mount
     useEffect(() => {
         async function fetchData() {
@@ -102,11 +112,27 @@ export default function NewSalePage() {
             try {
                 const [leadsResult, vehiclesResult] = await Promise.all([
                     supabase.from('leads').select('*').order('created_at', { ascending: false }),
-                    supabase.from('vehicles').select('*').eq('status', 'available').order('created_at', { ascending: false })
+                    supabase.from('vehicles').select('*').in('status', ['available', 'reserved']).order('created_at', { ascending: false })
                 ]);
 
                 if (leadsResult.data) setLeads(leadsResult.data as Lead[]);
-                if (vehiclesResult.data) setVehicles(vehiclesResult.data as Vehicle[]);
+                if (vehiclesResult.data) {
+                    const vehiclesList = vehiclesResult.data as Vehicle[];
+                    setVehicles(vehiclesList);
+
+                    // Auto-select vehicle if vehicleId is in URL
+                    if (vehicleIdParam) {
+                        const preSelectedVehicle = vehiclesList.find(v => v.id === vehicleIdParam);
+                        if (preSelectedVehicle) {
+                            setFormData(prev => ({
+                                ...prev,
+                                vehicleId: preSelectedVehicle.id,
+                                vehicleName: `${preSelectedVehicle.brand} ${preSelectedVehicle.model} ${preSelectedVehicle.year}`,
+                                salePrice: formatPrice(preSelectedVehicle.price)
+                            }));
+                        }
+                    }
+                }
             } catch (err) {
                 console.error('Error fetching data:', err);
             } finally {
@@ -115,18 +141,15 @@ export default function NewSalePage() {
         }
 
         fetchData();
-    }, []);
+    }, [vehicleIdParam]);
+
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const formatPrice = (value: string | number) => {
-        const numbers = String(value).replace(/\D/g, '');
-        const formatted = new Intl.NumberFormat('pt-BR').format(Number(numbers));
-        return formatted;
-    };
+
 
     const handlePriceChange = (field: 'salePrice' | 'discount' | 'downPayment') => (e: React.ChangeEvent<HTMLInputElement>) => {
         const formatted = formatPrice(e.target.value);
@@ -534,5 +557,13 @@ export default function NewSalePage() {
                 </div>
             </form>
         </div>
+    );
+}
+
+export default function NewSalePage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>}>
+            <NewSaleForm />
+        </Suspense>
     );
 }
