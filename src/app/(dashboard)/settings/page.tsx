@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, CreditCard, LogOut, Users, Mail, Crown, Shield, UserCheck, Copy, X, Loader2, Trash2, Save, Check } from 'lucide-react';
+import { User, CreditCard, LogOut, Users, Mail, Crown, Shield, UserCheck, Copy, X, Loader2, Trash2, Save, Check, Plus, Clock, AlertCircle, Zap } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -312,199 +312,324 @@ export default function SettingsPage() {
 
             {/* Team Tab */}
             {activeTab === 'team' && (
-                <div className="space-y-4">
+                <div className="space-y-6">
                     {loadingOrg ? (
-                        <div className="flex justify-center py-8">
-                            <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
+                        <div className="flex justify-center py-12">
+                            <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
                         </div>
                     ) : organization ? (
                         <>
-                            {/* Organization Info */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Users className="w-5 h-5" />
-                                        {organization.name}
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex items-center gap-4 text-sm">
-                                        <span className="text-foreground-muted">
-                                            {members.length} de {organization.max_members} membros
-                                        </span>
-                                        <span className="px-2 py-1 rounded-full bg-primary-500/10 text-primary-400 text-xs font-medium">
-                                            Plano {planLabels[organization.plan]?.name || 'Free'}
-                                        </span>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                            {/* Organization Header - Premium Design */}
+                            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-800/80 via-gray-900/90 to-gray-800/80 border border-gray-700/50">
+                                <div className="absolute inset-0 bg-gradient-to-r from-primary-500/10 via-transparent to-secondary-500/10" />
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/5 rounded-full blur-3xl" />
 
-                            {/* Team Members */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Membros</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    {members.map(member => {
-                                        const RoleIcon = roleLabels[member.role]?.icon || UserCheck;
-                                        return (
-                                            <div
-                                                key={member.id}
-                                                className="flex items-center justify-between p-3 rounded-xl bg-gray-800/30 border border-gray-700/50"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center text-white font-medium">
-                                                        {member.user?.email?.charAt(0).toUpperCase() || '?'}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-medium">{member.user?.email || 'Usuário'}</p>
-                                                        <div className="flex items-center gap-1 text-sm text-foreground-muted">
-                                                            <RoleIcon className="w-3 h-3" />
-                                                            {roleLabels[member.role]?.label}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {canManageMembers && member.role !== 'owner' && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-error-400 hover:bg-error-500/10"
-                                                        onClick={() => handleRemoveMember(member.id)}
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
-                                                )}
+                                <div className="relative p-6">
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/25">
+                                                <Users className="w-7 h-7 text-white" />
                                             </div>
-                                        );
-                                    })}
-                                </CardContent>
-                            </Card>
+                                            <div>
+                                                <h2 className="text-xl font-bold text-foreground">{organization.name}</h2>
+                                                <p className="text-sm text-foreground-muted">
+                                                    Gerencie sua equipe e permissões
+                                                </p>
+                                            </div>
+                                        </div>
 
-                            {/* Pending Invites */}
+                                        <div className="flex items-center gap-3">
+                                            <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${organization.plan === 'business'
+                                                ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 border border-amber-500/30'
+                                                : organization.plan === 'pro'
+                                                    ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-400 border border-purple-500/30'
+                                                    : 'bg-primary-500/10 text-primary-400 border border-primary-500/20'
+                                                }`}>
+                                                {planLabels[organization.plan]?.name || 'Free'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Stats Row */}
+                                    <div className="mt-6 flex items-center gap-6">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 rounded-lg bg-gray-700/50 flex items-center justify-center">
+                                                <Users className="w-4 h-4 text-primary-400" />
+                                            </div>
+                                            <div>
+                                                <p className="text-lg font-bold">{members.length}</p>
+                                                <p className="text-xs text-foreground-muted">Membros</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-px h-10 bg-gray-700" />
+
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 rounded-lg bg-gray-700/50 flex items-center justify-center">
+                                                <Mail className="w-4 h-4 text-yellow-400" />
+                                            </div>
+                                            <div>
+                                                <p className="text-lg font-bold">{invites.length}</p>
+                                                <p className="text-xs text-foreground-muted">Pendentes</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-px h-10 bg-gray-700" />
+
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1 bg-gray-700/50 rounded-full h-2 w-24 overflow-hidden">
+                                                <div
+                                                    className="h-full bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full transition-all duration-500"
+                                                    style={{ width: `${(members.length / organization.max_members) * 100}%` }}
+                                                />
+                                            </div>
+                                            <span className="text-sm text-foreground-muted">
+                                                {members.length}/{organization.max_members}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Team Members Section */}
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                                        <Users className="w-5 h-5 text-primary-400" />
+                                        Membros da Equipe
+                                    </h3>
+                                </div>
+
+                                <div className="bg-gray-800/30 rounded-2xl border border-gray-700/50 overflow-hidden">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="border-b border-gray-700/50">
+                                                <th className="text-left py-3 px-4 text-xs font-medium text-foreground-muted uppercase tracking-wider">Membro</th>
+                                                <th className="text-left py-3 px-4 text-xs font-medium text-foreground-muted uppercase tracking-wider">Função</th>
+                                                <th className="text-left py-3 px-4 text-xs font-medium text-foreground-muted uppercase tracking-wider">Desde</th>
+                                                <th className="text-right py-3 px-4 text-xs font-medium text-foreground-muted uppercase tracking-wider">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-700/30">
+                                            {members.map((member, index) => {
+                                                const RoleIcon = roleLabels[member.role]?.icon || UserCheck;
+                                                const colors = ['from-blue-500 to-cyan-500', 'from-purple-500 to-pink-500', 'from-orange-500 to-red-500', 'from-green-500 to-teal-500'];
+                                                return (
+                                                    <tr key={member.id} className="group hover:bg-gray-700/20 transition-colors">
+                                                        <td className="py-3 px-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors[index % colors.length]} flex items-center justify-center text-white font-semibold shadow-lg`}>
+                                                                    {member.user?.email?.charAt(0).toUpperCase() || '?'}
+                                                                </div>
+                                                                <div>
+                                                                    <p className="font-medium text-foreground">{member.user?.email?.split('@')[0] || 'Usuário'}</p>
+                                                                    <p className="text-sm text-foreground-muted">{member.user?.email}</p>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-3 px-4">
+                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${member.role === 'owner'
+                                                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                                                : member.role === 'admin'
+                                                                    ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                                                                    : 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+                                                                }`}>
+                                                                <RoleIcon className="w-3.5 h-3.5" />
+                                                                {roleLabels[member.role]?.label}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3 px-4">
+                                                            <span className="text-sm text-foreground-muted">
+                                                                {new Date(member.joined_at).toLocaleDateString('pt-BR', {
+                                                                    day: '2-digit', month: 'short', year: 'numeric'
+                                                                })}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3 px-4 text-right">
+                                                            {canManageMembers && member.role !== 'owner' && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-error-400 hover:bg-error-500/10"
+                                                                    onClick={() => handleRemoveMember(member.id)}
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </Button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Pending Invites Section */}
                             {invites.length > 0 && (
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Convites Pendentes</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-2">
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                                        <Clock className="w-5 h-5 text-yellow-400" />
+                                        Convites Pendentes
+                                        <span className="ml-2 px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 text-xs font-medium">
+                                            {invites.length}
+                                        </span>
+                                    </h3>
+
+                                    <div className="space-y-2">
                                         {invites.map(invite => (
                                             <div
                                                 key={invite.id}
-                                                className="flex items-center justify-between p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20"
+                                                className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-yellow-500/5 to-orange-500/5 border border-yellow-500/20 group hover:border-yellow-500/40 transition-colors"
                                             >
-                                                <div className="flex items-center gap-3">
-                                                    <Mail className="w-5 h-5 text-yellow-500" />
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                                                        <Mail className="w-5 h-5 text-yellow-500" />
+                                                    </div>
                                                     <div>
-                                                        <p className="font-medium">{invite.email}</p>
-                                                        <p className="text-sm text-foreground-muted">
-                                                            {roleLabels[invite.role]?.label} • Expira em{' '}
-                                                            {new Date(invite.expires_at).toLocaleDateString('pt-BR')}
-                                                        </p>
+                                                        <p className="font-medium text-foreground">{invite.email}</p>
+                                                        <div className="flex items-center gap-2 text-sm text-foreground-muted">
+                                                            <span className="px-2 py-0.5 rounded bg-gray-700/50 text-xs">
+                                                                {roleLabels[invite.role]?.label}
+                                                            </span>
+                                                            <span>•</span>
+                                                            <span>Expira {new Date(invite.expires_at).toLocaleDateString('pt-BR')}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
+                                                    className="opacity-0 group-hover:opacity-100 transition-opacity"
                                                     onClick={() => handleCancelInvite(invite.id)}
                                                 >
                                                     <X className="w-4 h-4" />
+                                                    <span className="ml-1">Cancelar</span>
                                                 </Button>
                                             </div>
                                         ))}
-                                    </CardContent>
-                                </Card>
+                                    </div>
+                                </div>
                             )}
 
-                            {/* Invite Form */}
+                            {/* Invite Form - Modern Design */}
                             {canManageMembers && members.length + invites.length < organization.max_members && (
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2">
-                                            <Mail className="w-5 h-5" />
-                                            Convidar Membro
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
+                                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-500/5 via-gray-800/50 to-secondary-500/5 border border-primary-500/20">
+                                    <div className="absolute top-0 left-0 w-32 h-32 bg-primary-500/10 rounded-full blur-2xl" />
+                                    <div className="absolute bottom-0 right-0 w-32 h-32 bg-secondary-500/10 rounded-full blur-2xl" />
+
+                                    <div className="relative p-6">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="w-10 h-10 rounded-xl bg-primary-500/20 flex items-center justify-center">
+                                                <UserCheck className="w-5 h-5 text-primary-400" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-semibold text-foreground">Convidar Novo Membro</h3>
+                                                <p className="text-sm text-foreground-muted">Envie um convite por email para adicionar à equipe</p>
+                                            </div>
+                                        </div>
+
                                         <form onSubmit={handleInvite} className="space-y-4">
                                             <div className="flex gap-3">
-                                                <div className="flex-1">
-                                                    <Input
+                                                <div className="flex-1 relative">
+                                                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-foreground-muted" />
+                                                    <input
                                                         type="email"
                                                         placeholder="email@exemplo.com"
                                                         value={inviteEmail}
                                                         onChange={(e) => setInviteEmail(e.target.value)}
                                                         required
+                                                        className="w-full h-12 pl-11 pr-4 rounded-xl bg-gray-800/50 border border-gray-700 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 text-foreground placeholder-foreground-muted transition-all"
                                                     />
                                                 </div>
                                                 {canChangeRoles && (
                                                     <select
                                                         value={inviteRole}
                                                         onChange={(e) => setInviteRole(e.target.value as 'admin' | 'member')}
-                                                        className="h-11 px-3 rounded-xl bg-gray-800/50 border border-gray-700 text-foreground"
+                                                        className="h-12 px-4 rounded-xl bg-gray-800/50 border border-gray-700 text-foreground cursor-pointer hover:border-gray-600 transition-colors"
                                                     >
-                                                        <option value="member">Membro</option>
-                                                        <option value="admin">Admin</option>
+                                                        <option value="member">👤 Membro</option>
+                                                        <option value="admin">🛡️ Admin</option>
                                                     </select>
                                                 )}
-                                                <Button type="submit" isLoading={inviting}>
+                                                <Button type="submit" isLoading={inviting} className="h-12 px-6">
+                                                    <Plus className="w-5 h-5 mr-2" />
                                                     Convidar
                                                 </Button>
                                             </div>
 
                                             {inviteError && (
-                                                <p className="text-sm text-error-400">{inviteError}</p>
+                                                <div className="flex items-center gap-2 p-3 rounded-xl bg-error-500/10 border border-error-500/20">
+                                                    <AlertCircle className="w-5 h-5 text-error-400" />
+                                                    <p className="text-sm text-error-400">{inviteError}</p>
+                                                </div>
                                             )}
 
                                             {inviteSuccess && (
-                                                <div className="p-3 rounded-xl bg-success-500/10 border border-success-500/20">
-                                                    <p className="text-sm text-success-400 mb-2">{inviteSuccess}</p>
+                                                <div className="p-4 rounded-xl bg-success-500/10 border border-success-500/20 space-y-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <Check className="w-5 h-5 text-success-400" />
+                                                        <p className="text-sm font-medium text-success-400">{inviteSuccess}</p>
+                                                    </div>
                                                     {inviteLink && (
                                                         <div className="flex gap-2">
                                                             <input
                                                                 type="text"
                                                                 value={inviteLink}
                                                                 readOnly
-                                                                className="flex-1 px-3 py-2 rounded-lg bg-gray-800/50 text-sm text-foreground-muted"
+                                                                className="flex-1 px-4 py-2 rounded-lg bg-gray-800/50 text-sm text-foreground-muted font-mono"
                                                             />
                                                             <Button
                                                                 type="button"
                                                                 variant="secondary"
                                                                 size="sm"
                                                                 onClick={copyInviteLink}
+                                                                className="gap-2"
                                                             >
                                                                 <Copy className="w-4 h-4" />
+                                                                Copiar
                                                             </Button>
                                                         </div>
                                                     )}
                                                 </div>
                                             )}
                                         </form>
-                                    </CardContent>
-                                </Card>
+                                    </div>
+                                </div>
                             )}
 
+                            {/* Upgrade CTA if limit reached */}
                             {members.length + invites.length >= organization.max_members && (
-                                <Card variant="elevated">
-                                    <CardContent className="py-4 text-center">
-                                        <p className="text-foreground-muted mb-3">
-                                            Limite de {organization.max_members} membros atingido
-                                        </p>
-                                        <Button variant="outline">
-                                            Fazer upgrade para mais membros
+                                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10 border border-amber-500/30 p-6">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                                                <Zap className="w-6 h-6 text-amber-400" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-semibold text-foreground">Limite de membros atingido</h3>
+                                                <p className="text-sm text-foreground-muted">
+                                                    Faça upgrade para adicionar mais membros à sua equipe
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            onClick={() => setActiveTab('subscription')}
+                                            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                                        >
+                                            Ver Planos
                                         </Button>
-                                    </CardContent>
-                                </Card>
+                                    </div>
+                                </div>
                             )}
                         </>
                     ) : (
-                        <Card>
-                            <CardContent className="py-8 text-center">
-                                <Users className="w-12 h-12 mx-auto mb-4 text-gray-600" />
-                                <p className="text-foreground-muted">
-                                    Nenhuma organização encontrada
-                                </p>
-                            </CardContent>
-                        </Card>
+                        <div className="text-center py-12">
+                            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-800/50 flex items-center justify-center">
+                                <Users className="w-8 h-8 text-foreground-muted" />
+                            </div>
+                            <p className="text-foreground-muted">Nenhuma organização encontrada</p>
+                        </div>
                     )}
                 </div>
             )}
@@ -559,6 +684,6 @@ export default function SettingsPage() {
                     </CardContent>
                 </Card>
             )}
-        </div>
+        </div >
     );
 }
