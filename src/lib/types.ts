@@ -5,7 +5,7 @@
 // ============================================
 
 export type OrganizationPlan = 'free' | 'pro' | 'business';
-export type OrganizationRole = 'owner' | 'admin' | 'member';
+export type OrganizationRole = 'owner' | 'admin' | 'vendedor' | 'rh' | 'contabilidade' | 'member';
 
 export interface Organization {
     id: string;
@@ -23,6 +23,7 @@ export interface OrganizationMember {
     organization_id: string;
     user_id: string;
     role: OrganizationRole;
+    display_name?: string;
     invited_by?: string;
     joined_at: string;
     // Joined data
@@ -36,7 +37,7 @@ export interface OrganizationInvite {
     id: string;
     organization_id: string;
     email: string;
-    role: 'admin' | 'member';
+    role: OrganizationRole;
     token: string;
     invited_by?: string;
     expires_at: string;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, CreditCard, LogOut, Users, Mail, Crown, Shield, UserCheck, Copy, X, Loader2, Trash2, Save, Check, Plus, Clock, AlertCircle, Zap } from 'lucide-react';
+import { User, CreditCard, LogOut, Users, Mail, Crown, Shield, UserCheck, Copy, X, Loader2, Trash2, Save, Check, Plus, Clock, AlertCircle, Zap, Edit2, Car, Calculator, Briefcase } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -9,10 +9,13 @@ import { Organization, OrganizationMember, OrganizationInvite, OrganizationRole 
 
 type TabType = 'profile' | 'team' | 'subscription';
 
-const roleLabels: Record<OrganizationRole, { label: string; icon: typeof Crown }> = {
-    owner: { label: 'Dono', icon: Crown },
-    admin: { label: 'Admin', icon: Shield },
-    member: { label: 'Membro', icon: UserCheck },
+const roleLabels: Record<OrganizationRole, { label: string; icon: typeof Crown; color: string }> = {
+    owner: { label: 'Dono', icon: Crown, color: 'amber' },
+    admin: { label: 'Administrador', icon: Shield, color: 'purple' },
+    vendedor: { label: 'Vendedor', icon: Car, color: 'blue' },
+    rh: { label: 'RH', icon: Briefcase, color: 'green' },
+    contabilidade: { label: 'Contabilidade', icon: Calculator, color: 'cyan' },
+    member: { label: 'Membro', icon: UserCheck, color: 'gray' },
 };
 
 const planLabels: Record<string, { name: string; members: number }> = {
@@ -35,7 +38,7 @@ export default function SettingsPage() {
 
     // Invite state
     const [inviteEmail, setInviteEmail] = useState('');
-    const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member');
+    const [inviteRole, setInviteRole] = useState<OrganizationRole>('vendedor');
     const [inviting, setInviting] = useState(false);
     const [inviteError, setInviteError] = useState('');
     const [inviteSuccess, setInviteSuccess] = useState('');
@@ -48,6 +51,11 @@ export default function SettingsPage() {
     const [savingProfile, setSavingProfile] = useState(false);
     const [profileSaved, setProfileSaved] = useState(false);
     const [loadingProfile, setLoadingProfile] = useState(true);
+
+    // Member editing state
+    const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+    const [editingMemberName, setEditingMemberName] = useState('');
+    const [savingMember, setSavingMember] = useState(false);
 
     // Fetch user profile
     useEffect(() => {
@@ -189,6 +197,43 @@ export default function SettingsPage() {
         } catch (err) {
             console.error('Error removing member:', err);
         }
+    };
+
+    const handleEditMember = (member: OrganizationMember) => {
+        setEditingMemberId(member.id);
+        setEditingMemberName(member.display_name || member.user?.email?.split('@')[0] || '');
+    };
+
+    const handleSaveMemberName = async () => {
+        if (!editingMemberId) return;
+        setSavingMember(true);
+
+        const supabase = createClient();
+        if (!supabase) {
+            setSavingMember(false);
+            return;
+        }
+
+        const { error } = await supabase
+            .from('organization_members')
+            .update({ display_name: editingMemberName })
+            .eq('id', editingMemberId);
+
+        if (!error) {
+            setMembers(prev => prev.map(m =>
+                m.id === editingMemberId
+                    ? { ...m, display_name: editingMemberName }
+                    : m
+            ));
+            setEditingMemberId(null);
+            setEditingMemberName('');
+        }
+        setSavingMember(false);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingMemberId(null);
+        setEditingMemberName('');
     };
 
     const handleCancelInvite = async (inviteId: string) => {
@@ -419,20 +464,65 @@ export default function SettingsPage() {
                                                         <td className="py-3 px-4">
                                                             <div className="flex items-center gap-3">
                                                                 <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors[index % colors.length]} flex items-center justify-center text-white font-semibold shadow-lg`}>
-                                                                    {member.user?.email?.charAt(0).toUpperCase() || '?'}
+                                                                    {(member.display_name || member.user?.email || '?').charAt(0).toUpperCase()}
                                                                 </div>
-                                                                <div>
-                                                                    <p className="font-medium text-foreground">{member.user?.email?.split('@')[0] || 'Usuário'}</p>
+                                                                <div className="flex-1">
+                                                                    {editingMemberId === member.id ? (
+                                                                        <div className="flex items-center gap-2">
+                                                                            <input
+                                                                                type="text"
+                                                                                value={editingMemberName}
+                                                                                onChange={(e) => setEditingMemberName(e.target.value)}
+                                                                                className="px-2 py-1 bg-gray-800 border border-gray-600 rounded-lg text-sm text-foreground w-40 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                                                                                autoFocus
+                                                                            />
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                onClick={handleSaveMemberName}
+                                                                                isLoading={savingMember}
+                                                                                className="text-success-400 hover:bg-success-500/10 p-1"
+                                                                            >
+                                                                                <Check className="w-4 h-4" />
+                                                                            </Button>
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                onClick={handleCancelEdit}
+                                                                                className="text-gray-400 hover:bg-gray-500/10 p-1"
+                                                                            >
+                                                                                <X className="w-4 h-4" />
+                                                                            </Button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="flex items-center gap-2">
+                                                                            <p className="font-medium text-foreground">
+                                                                                {member.display_name || member.user?.email?.split('@')[0] || 'Usuário'}
+                                                                            </p>
+                                                                            <button
+                                                                                onClick={() => handleEditMember(member)}
+                                                                                className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-primary-400"
+                                                                            >
+                                                                                <Edit2 className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
                                                                     <p className="text-sm text-foreground-muted">{member.user?.email}</p>
                                                                 </div>
                                                             </div>
                                                         </td>
                                                         <td className="py-3 px-4">
-                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${member.role === 'owner'
-                                                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                                                : member.role === 'admin'
-                                                                    ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-                                                                    : 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${roleLabels[member.role]?.color === 'amber'
+                                                                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                                                    : roleLabels[member.role]?.color === 'purple'
+                                                                        ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                                                                        : roleLabels[member.role]?.color === 'blue'
+                                                                            ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                                                            : roleLabels[member.role]?.color === 'green'
+                                                                                ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                                                                                : roleLabels[member.role]?.color === 'cyan'
+                                                                                    ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                                                                                    : 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
                                                                 }`}>
                                                                 <RoleIcon className="w-3.5 h-3.5" />
                                                                 {roleLabels[member.role]?.label}
@@ -545,11 +635,14 @@ export default function SettingsPage() {
                                                 {canChangeRoles && (
                                                     <select
                                                         value={inviteRole}
-                                                        onChange={(e) => setInviteRole(e.target.value as 'admin' | 'member')}
-                                                        className="h-12 px-4 rounded-xl bg-gray-800/50 border border-gray-700 text-foreground cursor-pointer hover:border-gray-600 transition-colors"
+                                                        onChange={(e) => setInviteRole(e.target.value as OrganizationRole)}
+                                                        className="h-12 px-4 rounded-xl bg-gray-800/50 border border-gray-700 text-foreground cursor-pointer hover:border-gray-600 transition-colors min-w-[180px]"
                                                     >
+                                                        <option value="vendedor">🚗 Vendedor</option>
+                                                        <option value="admin">🛡️ Administrador</option>
+                                                        <option value="rh">💼 RH</option>
+                                                        <option value="contabilidade">📊 Contabilidade</option>
                                                         <option value="member">👤 Membro</option>
-                                                        <option value="admin">🛡️ Admin</option>
                                                     </select>
                                                 )}
                                                 <Button type="submit" isLoading={inviting} className="h-12 px-6">
