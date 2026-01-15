@@ -196,35 +196,42 @@ function SettingsContent() {
             return;
         }
 
-        const fileExt = file.name.split('.').pop();
-        const filePath = `${userId}/${Date.now()}.${fileExt}`;
+        try {
+            const fileExt = file.name.split('.').pop();
+            const filePath = `${userId}/${Date.now()}.${fileExt}`;
 
-        // Upload to storage
-        const { error: uploadError } = await supabase.storage
-            .from('avatars')
-            .upload(filePath, file, { upsert: true });
+            // Upload to storage
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, file, { upsert: true });
 
-        if (uploadError) {
-            console.error('Upload error:', uploadError);
-            setUploadingAvatar(false);
-            return;
+            if (uploadError) {
+                console.error('Storage upload error:', uploadError);
+                alert(`Erro no upload: ${uploadError.message}`);
+                setUploadingAvatar(false);
+                return;
+            }
+
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath);
+
+            // Update profile with avatar_url
+            const { error: updateError } = await supabase
+                .from('user_profiles')
+                .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
+                .eq('id', userId);
+
+            if (updateError) {
+                console.error('Profile update error:', updateError);
+                alert(`Erro ao salvar: ${updateError.message}`);
+            } else {
+                setAvatarUrl(publicUrl);
+            }
+        } catch (err) {
+            console.error('Avatar upload failed:', err);
         }
-
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-            .from('avatars')
-            .getPublicUrl(filePath);
-
-        // Update profile
-        await supabase
-            .from('user_profiles')
-            .upsert({
-                id: userId,
-                avatar_url: publicUrl,
-                updated_at: new Date().toISOString(),
-            });
-
-        setAvatarUrl(publicUrl);
         setUploadingAvatar(false);
     };
 
