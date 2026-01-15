@@ -29,19 +29,27 @@ export default function SettingsPage() {
     const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState<TabType>('profile');
     const [isLoading, setIsLoading] = useState(false);
+    const [tabLoaded, setTabLoaded] = useState(false);
 
-    // Sync tab with URL on mount and when searchParams change
+    // Load tab from URL or localStorage on mount
     useEffect(() => {
         const tabFromUrl = searchParams.get('tab') as TabType;
+        const savedTab = typeof window !== 'undefined' ? localStorage.getItem('settings_tab') as TabType : null;
+
         if (tabFromUrl && ['profile', 'team', 'subscription'].includes(tabFromUrl)) {
             setActiveTab(tabFromUrl);
+            localStorage.setItem('settings_tab', tabFromUrl);
+        } else if (savedTab && ['profile', 'team', 'subscription'].includes(savedTab)) {
+            setActiveTab(savedTab);
         }
+        setTabLoaded(true);
     }, [searchParams]);
 
-    // Update URL when tab changes
+    // Update localStorage when tab changes
     const handleTabChange = (tab: TabType) => {
         setActiveTab(tab);
-        router.replace(`/settings?tab=${tab}`, { scroll: false });
+        localStorage.setItem('settings_tab', tab);
+        window.history.replaceState(null, '', `/settings?tab=${tab}`);
     };
 
     // Organization state
