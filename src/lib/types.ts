@@ -1,8 +1,56 @@
 // Database Types for VendorCarro
 
+// ============================================
+// ORGANIZATION TYPES (Multi-User Team Feature)
+// ============================================
+
+export type OrganizationPlan = 'free' | 'pro' | 'business';
+export type OrganizationRole = 'owner' | 'admin' | 'member';
+
+export interface Organization {
+    id: string;
+    name: string;
+    slug: string;
+    owner_id: string;
+    max_members: number;
+    plan: OrganizationPlan;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface OrganizationMember {
+    id: string;
+    organization_id: string;
+    user_id: string;
+    role: OrganizationRole;
+    invited_by?: string;
+    joined_at: string;
+    // Joined data
+    user?: {
+        id: string;
+        email: string;
+    };
+}
+
+export interface OrganizationInvite {
+    id: string;
+    organization_id: string;
+    email: string;
+    role: 'admin' | 'member';
+    token: string;
+    invited_by?: string;
+    expires_at: string;
+    created_at: string;
+}
+
+// ============================================
+// VEHICLE TYPES
+// ============================================
+
 export interface Vehicle {
     id: string;
     user_id: string;
+    organization_id?: string; // Multi-user support
     brand: string;
     model: string;
     year: number;
@@ -32,6 +80,10 @@ export interface VehicleDocument {
     uploaded_at: string;
 }
 
+// ============================================
+// LEAD TYPES
+// ============================================
+
 export interface LeadDocument {
     name: string;
     type: 'cpf' | 'rg' | 'comprovante_residencia' | 'comprovante_renda' | 'cnh' | 'contrato' | 'other';
@@ -52,6 +104,7 @@ export interface LeadAddress {
 export interface Lead {
     id: string;
     user_id: string;
+    organization_id?: string; // Multi-user support
     name: string;
     email?: string;
     phone: string;
@@ -77,9 +130,14 @@ export interface Lead {
     updated_at: string;
 }
 
+// ============================================
+// SALE TYPES
+// ============================================
+
 export interface Sale {
     id: string;
     user_id: string;
+    organization_id?: string; // Multi-user support
     lead_id: string;
     vehicle_id: string;
     sale_price: number;
@@ -95,7 +153,12 @@ export interface Sale {
     vehicle?: Vehicle;
 }
 
-// Insert types (without id and timestamps)
+// ============================================
+// INSERT TYPES (without id and timestamps)
+// ============================================
+
+export type OrganizationInsert = Omit<Organization, 'id' | 'created_at' | 'updated_at'>;
 export type VehicleInsert = Omit<Vehicle, 'id' | 'created_at' | 'updated_at'>;
 export type LeadInsert = Omit<Lead, 'id' | 'created_at' | 'updated_at'>;
 export type SaleInsert = Omit<Sale, 'id' | 'created_at' | 'lead' | 'vehicle'>;
+
