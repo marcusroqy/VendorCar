@@ -25,7 +25,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Email is required' }, { status: 400 });
         }
 
-        if (!['admin', 'member'].includes(role)) {
+        const validRoles = ['admin', 'member', 'vendedor', 'rh', 'contabilidade'];
+        if (!validRoles.includes(role)) {
             return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
         }
 
