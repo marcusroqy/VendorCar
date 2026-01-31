@@ -1,11 +1,42 @@
-import { DollarSign, Plus, TrendingUp, Car, Users } from 'lucide-react';
+import { DollarSign, Plus, TrendingUp, Car } from 'lucide-react';
 import Link from 'next/link';
 import { Button, Card, CardContent } from '@/components/ui';
+import { createClient } from '@/lib/supabase/server';
+import { Sale } from '@/lib/types';
 
-export default function SalesPage() {
-    // TODO: Fetch real data from Supabase
-    const sales: unknown[] = [];
+function formatCurrency(value: number) {
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+    }).format(value);
+}
+
+function formatDate(date: string) {
+    return new Intl.DateTimeFormat('pt-BR').format(new Date(date));
+}
+
+export default async function SalesPage() {
+    const supabase = await createClient();
+    let sales: Sale[] = [];
+
+    if (supabase) {
+        const { data } = await supabase
+            .from('sales')
+            .select(`
+                *,
+                vehicle:vehicles(brand, model, images),
+                lead:leads(name, email)
+            `)
+            .order('sale_date', { ascending: false });
+
+        if (data) {
+            sales = data as unknown as Sale[];
+        }
+    }
+
     const hasData = sales.length > 0;
+    const totalSales = sales.reduce((acc, sale) => acc + sale.sale_price, 0);
+    const averageTicket = hasData ? totalSales / sales.length : 0;
 
     return (
         <div className="space-y-6">
@@ -32,7 +63,7 @@ export default function SalesPage() {
                             </div>
                             <div>
                                 <p className="text-sm text-foreground-muted">Total Vendas</p>
-                                <p className="text-2xl font-bold">R$ 0</p>
+                                <p className="text-2xl font-bold">{formatCurrency(totalSales)}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -45,7 +76,7 @@ export default function SalesPage() {
                             </div>
                             <div>
                                 <p className="text-sm text-foreground-muted">Veículos Vendidos</p>
-                                <p className="text-2xl font-bold">0</p>
+                                <p className="text-2xl font-bold">{sales.length}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -58,7 +89,7 @@ export default function SalesPage() {
                             </div>
                             <div>
                                 <p className="text-sm text-foreground-muted">Ticket Médio</p>
-                                <p className="text-2xl font-bold">R$ 0</p>
+                                <p className="text-2xl font-bold">{formatCurrency(averageTicket)}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -87,9 +118,53 @@ export default function SalesPage() {
                 </Card>
             ) : (
                 <Card variant="glass">
-                    <CardContent className="p-6">
-                        {/* TODO: Sales list will go here */}
-                        <p className="text-foreground-muted">Lista de vendas...</p>
+                    <CardContent className="p-0 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-white/5 text-foreground-muted uppercase text-xs font-semibold">
+                                    <tr>
+                                        <th className="px-6 py-4">Data</th>
+                                        <th className="px-6 py-4">Veículo</th>
+                                        <th className="px-6 py-4">Cliente</th>
+                                        <th className="px-6 py-4 text-right">Valor</th>
+                                        <th className="px-6 py-4 text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {sales.map((sale) => (
+                                        <tr
+                                            key={sale.id}
+                                            className="hover:bg-white/5 transition-colors group relative"
+                                        >
+                                            <td className="px-6 py-4 font-medium">
+                                                <Link href={`/sales/${sale.id}`} className="absolute inset-0 z-10" />
+                                                {formatDate(sale.sale_date)}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {sale.vehicle ? (
+                                                    <span className="font-medium text-foreground">
+                                                        {sale.vehicle.brand} {sale.vehicle.model}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-foreground-muted italic">Veículo removido</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {sale.lead?.name || <span className="text-foreground-muted italic">Desconhecido</span>}
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-bold text-success-400">
+                                                {formatCurrency(sale.sale_price)}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-500/20 text-success-400">
+                                                    Concluída
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </CardContent>
                 </Card>
             )}

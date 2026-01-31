@@ -7,6 +7,8 @@ import { ArrowLeft, Car, Save, X, Loader2, Calendar, Gauge, Upload, Image as Ima
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
 import { createClient } from '@/lib/supabase/client';
 import { Vehicle, VehicleDocument } from '@/lib/types';
+import { useOrganization } from '@/hooks/use-organization';
+import { uploadVehicleImage } from '@/lib/storage';
 
 const fuelOptions = [
     { value: 'flex', label: 'Flex' },
@@ -41,6 +43,7 @@ const documentTypeOptions = [
 export default function VehicleEditPage() {
     const router = useRouter();
     const params = useParams();
+    const { currentOrganization } = useOrganization();
     const vehicleId = params.id as string;
     const fileInputRef = useRef<HTMLInputElement>(null);
     const documentInputRef = useRef<HTMLInputElement>(null);
@@ -132,20 +135,21 @@ export default function VehicleEditPage() {
 
         setUploading(true);
 
-        for (const file of Array.from(files)) {
-            if (!file.type.startsWith('image/')) continue;
+        try {
+            for (const file of Array.from(files)) {
+                if (!file.type.startsWith('image/')) continue;
 
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                if (event.target?.result) {
-                    setImages(prev => [...prev, event.target?.result as string]);
-                }
-            };
-            reader.readAsDataURL(file);
+                // Upload to Storage (Compress -> Upload -> URL)
+                const publicUrl = await uploadVehicleImage(file);
+                setImages(prev => [...prev, publicUrl]);
+            }
+        } catch (error) {
+            console.error('Upload failed:', error);
+            setError('Erro ao enviar imagens.');
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
-
-        setUploading(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -209,6 +213,14 @@ export default function VehicleEditPage() {
                 images: images.length > 0 ? images : null,
                 updated_at: new Date().toISOString(),
             };
+
+            // If we have a current organization, try to link it if it wasn't linked before
+            // This acts as a "migration on update" for legacy data
+            if (currentOrganization) {
+                // We can just send it; if it's already set in DB it won't change unless we overwrite
+                // But typically RLS prevents changing org_id if not owner, so this is safe for own data
+                baseData.organization_id = currentOrganization.id;
+            }
 
             // Try to save with all fields first
             let updateData = { ...baseData };

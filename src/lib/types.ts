@@ -13,6 +13,10 @@ export interface Organization {
     slug: string;
     owner_id: string;
     logo_url?: string;
+    phone?: string;
+    email?: string;
+    website?: string;
+    address?: string;
     max_members: number;
     plan: OrganizationPlan;
     created_at: string;
@@ -166,3 +170,19 @@ export type VehicleInsert = Omit<Vehicle, 'id' | 'created_at' | 'updated_at'>;
 export type LeadInsert = Omit<Lead, 'id' | 'created_at' | 'updated_at'>;
 export type SaleInsert = Omit<Sale, 'id' | 'created_at' | 'lead' | 'vehicle'>;
 
+
+// ============================================
+// USER PROFILE TYPES
+// ============================================
+
+export interface UserProfile {
+    id: string;
+    email?: string;
+    full_name?: string;
+    avatar_url?: string;
+    role?: 'admin' | 'user';
+    onboarding_completed?: boolean;
+    onboarding_step?: number;
+    created_at?: string;
+    updated_at?: string;
+}

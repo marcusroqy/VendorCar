@@ -29,23 +29,30 @@ export function formatPriceWithCents(value: number | null | undefined): string {
 /**
  * Format phone number to Brazilian format
  */
-export function formatPhone(phone: string | null | undefined): string {
-    if (!phone) return '-';
+export function formatPhone(value: string | null | undefined): string {
+    if (!value) return '';
 
-    // Remove non-digits
-    const digits = phone.replace(/\D/g, '');
+    const digits = value.replace(/\D/g, '');
 
-    // Mobile: (11) 99999-9999
-    if (digits.length === 11) {
-        return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+    // (11) 99999-9999
+    if (digits.length > 10) {
+        return digits
+            .replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
     }
-
-    // Landline: (11) 3333-3333
-    if (digits.length === 10) {
-        return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    // (11) 9999-9999
+    else if (digits.length > 6) {
+        return digits
+            .replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
     }
-
-    return phone;
+    // (11) 99...
+    else if (digits.length > 2) {
+        return digits
+            .replace(/^(\d{2})(\d{0,5}).*/, '($1) $2');
+    }
+    // (11
+    else {
+        return digits;
+    }
 }
 
 /**

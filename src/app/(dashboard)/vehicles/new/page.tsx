@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
 import { createClient } from '@/lib/supabase/client';
+import { useOrganization } from '@/hooks/use-organization';
+import { uploadVehicleImage } from '@/lib/storage';
 
 interface VehicleDocument {
     name: string;
@@ -50,6 +52,7 @@ const documentTypeOptions = [
 
 export default function NewVehiclePage() {
     const router = useRouter();
+    const { currentOrganization } = useOrganization();
     const imageInputRef = useRef<HTMLInputElement>(null);
     const documentInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,16 +106,17 @@ export default function NewVehiclePage() {
         setUploadingImage(true);
         const file = files[0];
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            if (event.target?.result) {
-                setImages(prev => [...prev, event.target!.result as string]);
-            }
+        try {
+            // Upload to Storage (Compress -> Upload -> URL)
+            const publicUrl = await uploadVehicleImage(file);
+            setImages(prev => [...prev, publicUrl]);
+        } catch (error) {
+            console.error('Upload failed:', error);
+            setError('Erro ao enviar imagem. Tente novamente.');
+        } finally {
             setUploadingImage(false);
-        };
-        reader.readAsDataURL(file);
-
-        if (imageInputRef.current) imageInputRef.current.value = '';
+            if (imageInputRef.current) imageInputRef.current.value = '';
+        }
     };
 
     const removeImage = (index: number) => {
@@ -183,12 +187,23 @@ export default function NewVehiclePage() {
                 return;
             }
 
+            // Get organization context manually or via hook if component was wrapped (it is now)
+            // ensuring we use the one from the hook would be cleaner if we refactored the component to use the hook
+            // But since this is a big function, let's just use the hook at the top level.
+
+            if (!currentOrganization) {
+                setError('Nenhuma organização selecionada. Atualize a página.');
+                setSaving(false);
+                return;
+            }
+
             const priceNumber = Number(price.replace(/\D/g, ''));
             const mileageNumber = mileage ? Number(mileage) : null;
             const purchasePriceNumber = purchasePrice ? Number(purchasePrice.replace(/\D/g, '')) : null;
 
             const vehicleData: Record<string, unknown> = {
                 user_id: user.id,
+                organization_id: currentOrganization.id, // CRITICAL: Link to Org
                 brand,
                 model,
                 year: Number(year),
@@ -621,8 +636,8 @@ export default function NewVehiclePage() {
                                             type="button"
                                             onClick={() => setStatus(option.value)}
                                             className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${status === option.value
-                                                    ? 'bg-primary-500/20 border border-primary-500'
-                                                    : 'bg-gray-800/30 border border-gray-700/50 hover:bg-gray-800/50'
+                                                ? 'bg-primary-500/20 border border-primary-500'
+                                                : 'bg-gray-800/30 border border-gray-700/50 hover:bg-gray-800/50'
                                                 }`}
                                         >
                                             <div className={`w-3 h-3 rounded-full ${option.color}`}></div>

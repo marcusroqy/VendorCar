@@ -1,7 +1,10 @@
 'use client';
 
+import { LazyMotionProvider } from './LazyMotionProvider';
 import { type ReactNode } from 'react';
 import { QueryProvider } from './query-provider';
+
+import { OrganizationProvider } from './organization-provider';
 
 interface ProvidersProps {
     children: ReactNode;
@@ -10,7 +13,11 @@ interface ProvidersProps {
 export function Providers({ children }: ProvidersProps) {
     return (
         <QueryProvider>
-            {children}
+            <OrganizationProvider>
+                <LazyMotionProvider>
+                    {children}
+                </LazyMotionProvider>
+            </OrganizationProvider>
         </QueryProvider>
     );
 }

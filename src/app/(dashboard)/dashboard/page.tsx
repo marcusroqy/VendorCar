@@ -9,6 +9,32 @@ import Link from 'next/link';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { createClient } from '@/lib/supabase/client';
 import { Lead, Vehicle, Sale } from '@/lib/types';
+import nextDynamic from 'next/dynamic';
+
+export const dynamic = 'force-dynamic';
+
+// Dynamic Imports with Loading States
+const StatsGrid = nextDynamic(() => import('@/components/dashboard/StatsGrid'), {
+    loading: () => (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
+            {[1, 2, 3, 4].map(i => (
+                <div key={i} className="h-32 bg-gray-800/50 rounded-2xl"></div>
+            ))}
+        </div>
+    )
+});
+
+const RecentLeads = nextDynamic(() => import('@/components/dashboard/RecentLeads'), {
+    loading: () => <div className="h-96 bg-gray-800/50 rounded-2xl animate-pulse"></div>
+});
+
+const RecentVehicles = nextDynamic(() => import('@/components/dashboard/RecentVehicles'), {
+    loading: () => <div className="h-96 bg-gray-800/50 rounded-2xl animate-pulse"></div>
+});
+
+const SalesChart = nextDynamic(() => import('@/components/dashboard/SalesChart'), {
+    loading: () => <div className="h-[300px] bg-gray-800/50 rounded-2xl animate-pulse"></div>
+});
 
 interface DashboardStats {
     totalVehicles: number;
@@ -21,23 +47,11 @@ interface DashboardStats {
     conversionRate: number;
 }
 
-const statusColors: Record<string, string> = {
-    new: 'bg-blue-500',
-    contacted: 'bg-purple-500',
-    interested: 'bg-green-500',
-    negotiating: 'bg-yellow-500',
-    closed: 'bg-success-500',
-    lost: 'bg-gray-500',
-};
-
-const statusLabels: Record<string, string> = {
-    new: 'Novo',
-    contacted: 'Contactado',
-    interested: 'Interessado',
-    negotiating: 'Em Negociação',
-    closed: 'Fechado',
-    lost: 'Perdido',
-};
+interface SalesChartData {
+    month: string;
+    value: number;
+    count: number;
+}
 
 export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
@@ -53,6 +67,8 @@ export default function DashboardPage() {
     });
     const [recentLeads, setRecentLeads] = useState<Lead[]>([]);
     const [recentVehicles, setRecentVehicles] = useState<Vehicle[]>([]);
+    const [salesChartData, setSalesChartData] = useState<SalesChartData[]>([]);
+    const [selectedPeriod, setSelectedPeriod] = useState('6months');
     const [userName, setUserName] = useState('');
 
     useEffect(() => {
@@ -64,78 +80,128 @@ export default function DashboardPage() {
             }
 
             try {
-                // Get user info
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
-                    console.log('User ID:', user.id);
+                    // Fetch LAST 24 MONTHS for flexibility
+                    const startDate = new Date();
+                    startDate.setMonth(startDate.getMonth() - 24);
+                    startDate.setDate(1);
+                    startDate.setHours(0, 0, 0, 0);
 
-                    // Try to get name from profile first
-                    const { data: profile, error: profileError } = await supabase
-                        .from('user_profiles')
-                        .select('name')
-                        .eq('id', user.id)
-                        .single();
+                    // Fetch all data in parallel
+                    const [profileResult, vehiclesResult, leadsResult, salesResult] = await Promise.all([
+                        supabase.from('user_profiles').select('name').eq('id', user.id).single(),
+                        supabase.from('vehicles').select('*').order('created_at', { ascending: false }),
+                        supabase.from('leads').select('*').order('created_at', { ascending: false }),
+                        supabase.from('sales').select('*').gte('sale_date', startDate.toISOString()).order('sale_date', { ascending: true })
+                    ]);
 
-                    console.log('Profile data:', profile, 'Error:', profileError);
-
+                    // Process Profile
+                    const profile = profileResult.data;
                     if (profile?.name) {
                         setUserName(profile.name);
                     } else if (user.email) {
                         setUserName(user.email.split('@')[0]);
                     }
+
+                    // Process Vehicles
+                    const vehiclesList = (vehiclesResult.data as Vehicle[]) || [];
+                    const availableVehicles = vehiclesList.filter(v => v.status === 'available');
+
+                    // Process Leads
+                    const leadsList = (leadsResult.data as Lead[]) || [];
+                    const newLeads = leadsList.filter(l => l.status === 'new');
+                    const hotLeads = leadsList.filter(l => ['interested', 'negotiating'].includes(l.status));
+
+                    // Process Sales
+                    const salesList = (salesResult.data as Sale[]) || [];
+
+                    // Filter sales for current month for stats
+                    const now = new Date();
+                    const currentMonthSales = salesList.filter(s => {
+                        const saleDate = new Date(s.sale_date);
+                        return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
+                    });
+
+                    const revenueThisMonth = currentMonthSales.reduce((sum, s) => sum + (s.sale_price || 0), 0);
+
+                    // --- Process Sales Chart Data Based on Period ---
+                    let chartStart = new Date();
+                    let monthsToProcess = 6;
+
+                    if (selectedPeriod === '6months') {
+                        chartStart.setMonth(now.getMonth() - 5);
+                        chartStart.setDate(1);
+                        monthsToProcess = 6;
+                    } else {
+                        // Specific Year
+                        const year = parseInt(selectedPeriod);
+                        chartStart = new Date(year, 0, 1);
+                        monthsToProcess = 12;
+                    }
+
+                    // Create robust YYYY-MM map
+                    const chartDataMap = new Map<string, { monthName: string, value: number, count: number }>();
+
+                    // Initialize buckets
+                    for (let i = 0; i < monthsToProcess; i++) {
+                        const d = new Date(chartStart);
+                        d.setMonth(chartStart.getMonth() + i);
+
+                        const year = d.getFullYear();
+                        const month = d.getMonth() + 1;
+                        const key = `${year}-${month.toString().padStart(2, '0')}`;
+                        const monthName = d.toLocaleString('pt-BR', { month: 'short' }).toUpperCase().replace('.', '');
+
+                        chartDataMap.set(key, { monthName, value: 0, count: 0 });
+                    }
+
+                    // Fill buckets
+                    salesList.forEach(sale => {
+                        const d = new Date(sale.sale_date);
+                        const year = d.getFullYear();
+                        const month = d.getMonth() + 1;
+                        const key = `${year}-${month.toString().padStart(2, '0')}`;
+
+                        if (chartDataMap.has(key)) {
+                            const entry = chartDataMap.get(key)!;
+                            chartDataMap.set(key, {
+                                ...entry,
+                                value: entry.value + (sale.sale_price || 0),
+                                count: entry.count + 1
+                            });
+                        }
+                    });
+
+                    // Convert back to array
+                    const chartData = Array.from(chartDataMap.values()).map(item => ({
+                        month: item.monthName,
+                        value: item.value,
+                        count: item.count
+                    }));
+
+                    setSalesChartData(chartData);
+
+                    // Calculate conversion rate
+                    const closedLeads = leadsList.filter(l => l.status === 'closed').length;
+                    const conversionRate = leadsList.length > 0
+                        ? Math.round((closedLeads / leadsList.length) * 100)
+                        : 0;
+
+                    setStats({
+                        totalVehicles: vehiclesList.length,
+                        availableVehicles: availableVehicles.length,
+                        totalLeads: leadsList.length,
+                        newLeads: newLeads.length,
+                        hotLeads: hotLeads.length,
+                        salesThisMonth: currentMonthSales.length,
+                        revenueThisMonth,
+                        conversionRate,
+                    });
+
+                    setRecentLeads(leadsList.slice(0, 5));
+                    setRecentVehicles(vehiclesList.slice(0, 4));
                 }
-
-                // Fetch vehicles
-                const { data: vehicles } = await supabase
-                    .from('vehicles')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-
-                const vehicleList = (vehicles as Vehicle[]) || [];
-                const availableVehicles = vehicleList.filter(v => v.status === 'available');
-
-                // Fetch leads
-                const { data: leads } = await supabase
-                    .from('leads')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-
-                const leadList = (leads as Lead[]) || [];
-                const newLeads = leadList.filter(l => l.status === 'new');
-                const hotLeads = leadList.filter(l => ['interested', 'negotiating'].includes(l.status));
-
-                // Fetch sales this month
-                const startOfMonth = new Date();
-                startOfMonth.setDate(1);
-                startOfMonth.setHours(0, 0, 0, 0);
-
-                const { data: sales } = await supabase
-                    .from('sales')
-                    .select('*')
-                    .gte('sale_date', startOfMonth.toISOString());
-
-                const salesList = (sales as Sale[]) || [];
-                const revenueThisMonth = salesList.reduce((sum, s) => sum + (s.sale_price || 0), 0);
-
-                // Calculate conversion rate
-                const closedLeads = leadList.filter(l => l.status === 'closed').length;
-                const conversionRate = leadList.length > 0
-                    ? Math.round((closedLeads / leadList.length) * 100)
-                    : 0;
-
-                setStats({
-                    totalVehicles: vehicleList.length,
-                    availableVehicles: availableVehicles.length,
-                    totalLeads: leadList.length,
-                    newLeads: newLeads.length,
-                    hotLeads: hotLeads.length,
-                    salesThisMonth: salesList.length,
-                    revenueThisMonth,
-                    conversionRate,
-                });
-
-                setRecentLeads(leadList.slice(0, 5));
-                setRecentVehicles(vehicleList.slice(0, 4));
             } catch (err) {
                 console.error('Error fetching dashboard data:', err);
             } finally {
@@ -144,7 +210,7 @@ export default function DashboardPage() {
         }
 
         fetchDashboardData();
-    }, []);
+    }, [selectedPeriod]);
 
     const formatPrice = (value: number) => {
         return value.toLocaleString('pt-BR');
@@ -155,18 +221,6 @@ export default function DashboardPage() {
         if (hour < 12) return 'Bom dia';
         if (hour < 18) return 'Boa tarde';
         return 'Boa noite';
-    };
-
-    const formatDate = (date: string) => {
-        const d = new Date(date);
-        const now = new Date();
-        const diff = now.getTime() - d.getTime();
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-        if (days === 0) return 'Hoje';
-        if (days === 1) return 'Ontem';
-        if (days < 7) return `${days} dias atrás`;
-        return d.toLocaleDateString('pt-BR');
     };
 
     if (loading) {
@@ -185,17 +239,17 @@ export default function DashboardPage() {
     return (
         <div className="space-y-6">
             {/* Welcome Header */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary-600 via-primary-500 to-secondary-500 p-6 sm:p-8">
-                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYSIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVHJhbnNmb3JtPSJyb3RhdGUoNDUpIj48cGF0aCBkPSJNLTEwIDMwaDYwTTMwIC0xMHY2MCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjEiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3QgZmlsbD0idXJsKCNhKSIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIvPjwvc3ZnPg==')] opacity-50"></div>
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary-600 via-primary-500 to-secondary-500 p-6 sm:p-8 shadow-2xl shadow-primary-500/10">
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYSIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVHJhbnNmb3JtPSJyb3RhdGUoNDUpIj48cGF0aCBkPSJNLTEwIDMwaDYwTTMwIC0xMHY2MCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjEiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3QgZmlsbD0idXJsKCNhKSIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIvPjwvc3ZnPg==')] opacity-30 mix-blend-overlay"></div>
                 <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <p className="text-white/80 text-sm mb-1">{getGreeting()},</p>
-                        <h1 className="text-2xl sm:text-3xl font-bold text-white capitalize">{userName || 'Vendedor'}</h1>
-                        <p className="text-white/70 mt-1">Aqui está o resumo do seu negócio hoje</p>
+                        <p className="text-white/80 text-sm mb-1 font-medium tracking-wide uppercase opacity-80">{getGreeting()},</p>
+                        <h1 className="text-3xl sm:text-4xl font-bold text-white capitalize tracking-tight">{userName || 'Vendedor'}</h1>
+                        <p className="text-white/70 mt-2 font-light">Aqui está o resumo do seu negócio hoje</p>
                     </div>
                     <div className="flex gap-3">
                         <Link href="/vehicles/new">
-                            <Button className="bg-white text-primary-600 hover:bg-white/90" leftIcon={<Plus className="w-5 h-5" />}>
+                            <Button className="bg-white text-primary-600 hover:bg-white/90 shadow-lg shadow-black/10" leftIcon={<Plus className="w-5 h-5" />}>
                                 Novo Veículo
                             </Button>
                         </Link>
@@ -209,98 +263,19 @@ export default function DashboardPage() {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Vehicles */}
-                <Link href="/vehicles">
-                    <Card variant="interactive" className="h-full group">
-                        <CardContent className="p-5">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-sm text-foreground-muted">Veículos Disponíveis</p>
-                                    <p className="text-3xl font-bold mt-1 group-hover:text-primary-400 transition-colors">{stats.availableVehicles}</p>
-                                    <p className="text-xs text-foreground-subtle mt-1">{stats.totalVehicles} no total</p>
-                                </div>
-                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500/20 to-primary-500/5 flex items-center justify-center">
-                                    <Car className="w-6 h-6 text-primary-400" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </Link>
-
-                {/* Leads */}
-                <Link href="/leads">
-                    <Card variant="interactive" className="h-full group">
-                        <CardContent className="p-5">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-sm text-foreground-muted">Leads Ativos</p>
-                                    <p className="text-3xl font-bold mt-1 group-hover:text-success-400 transition-colors">{stats.totalLeads}</p>
-                                    {stats.newLeads > 0 && (
-                                        <p className="text-xs text-success-400 mt-1 flex items-center gap-1">
-                                            <span className="w-2 h-2 rounded-full bg-success-400 animate-pulse"></span>
-                                            {stats.newLeads} novos
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-success-500/20 to-success-500/5 flex items-center justify-center">
-                                    <Users className="w-6 h-6 text-success-400" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </Link>
-
-                {/* Sales */}
-                <Link href="/sales">
-                    <Card variant="interactive" className="h-full group">
-                        <CardContent className="p-5">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-sm text-foreground-muted">Vendas do Mês</p>
-                                    <p className="text-3xl font-bold mt-1 group-hover:text-warning-400 transition-colors">{stats.salesThisMonth}</p>
-                                    <p className="text-xs text-foreground-subtle mt-1">R$ {formatPrice(stats.revenueThisMonth)}</p>
-                                </div>
-                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-warning-500/20 to-warning-500/5 flex items-center justify-center">
-                                    <DollarSign className="w-6 h-6 text-warning-400" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </Link>
-
-                {/* Conversion */}
-                <Card className="h-full">
-                    <CardContent className="p-5">
-                        <div className="flex items-start justify-between">
-                            <div>
-                                <p className="text-sm text-foreground-muted">Taxa de Conversão</p>
-                                <p className="text-3xl font-bold mt-1">{stats.conversionRate}%</p>
-                                {stats.hotLeads > 0 && (
-                                    <p className="text-xs text-yellow-400 mt-1 flex items-center gap-1">
-                                        <Zap className="w-3 h-3" />
-                                        {stats.hotLeads} leads quentes
-                                    </p>
-                                )}
-                            </div>
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/5 flex items-center justify-center">
-                                <Target className="w-6 h-6 text-blue-400" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+            <StatsGrid stats={stats} />
 
             {/* Main Content */}
             <div className="grid lg:grid-cols-3 gap-6">
-                {/* Left Column - Leads */}
+                {/* Left Column - Leads & Charts */}
                 <div className="lg:col-span-2 space-y-6">
                     {/* Hot Leads Alert */}
                     {stats.hotLeads > 0 && (
-                        <Card className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/30">
-                            <CardContent className="p-4">
+                        <Card className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/30 overflow-hidden relative">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                            <CardContent className="p-4 relative">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                                    <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center animate-pulse">
                                         <Zap className="w-6 h-6 text-yellow-400" />
                                     </div>
                                     <div className="flex-1">
@@ -310,7 +285,7 @@ export default function DashboardPage() {
                                         </p>
                                     </div>
                                     <Link href="/leads?filter=hot">
-                                        <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black">
+                                        <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold shadow-lg shadow-yellow-500/20">
                                             Ver agora
                                         </Button>
                                     </Link>
@@ -319,113 +294,22 @@ export default function DashboardPage() {
                         </Card>
                     )}
 
-                    {/* Recent Leads */}
-                    <Card variant="glass">
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle className="flex items-center gap-2">
-                                <Users className="w-5 h-5 text-success-400" />
-                                Leads Recentes
-                            </CardTitle>
-                            <Link href="/leads">
-                                <Button variant="ghost" size="sm" rightIcon={<ArrowRight className="w-4 h-4" />}>
-                                    Ver todos
-                                </Button>
-                            </Link>
-                        </CardHeader>
-                        <CardContent>
-                            {recentLeads.length > 0 ? (
-                                <div className="space-y-3">
-                                    {recentLeads.map(lead => (
-                                        <div key={lead.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-800/30 hover:bg-gray-800/50 transition-colors">
-                                            <Link href={`/leads/${lead.id}`} className="flex items-center gap-3 flex-1 cursor-pointer">
-                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center text-white text-sm font-semibold">
-                                                    {lead.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium">{lead.name}</p>
-                                                    <p className="text-xs text-foreground-muted">{lead.vehicle_interest || lead.phone}</p>
-                                                </div>
-                                            </Link>
-                                            <div className="flex items-center gap-2">
-                                                <span className={`w-2 h-2 rounded-full ${statusColors[lead.status]}`}></span>
-                                                <span className="text-xs text-foreground-muted hidden sm:block">{statusLabels[lead.status]}</span>
-                                                <a
-                                                    href={`https://wa.me/55${lead.phone.replace(/\D/g, '')}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center hover:bg-green-500/30 transition-colors ml-2"
-                                                >
-                                                    <MessageSquare className="w-4 h-4 text-green-400" />
-                                                </a>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="text-center py-8">
-                                    <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-success-500/10 flex items-center justify-center">
-                                        <Users className="w-7 h-7 text-success-400" />
-                                    </div>
-                                    <p className="text-foreground-muted mb-4">Nenhum lead ainda</p>
-                                    <Link href="/leads/new">
-                                        <Button variant="secondary" size="sm">Cadastrar lead</Button>
-                                    </Link>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                    {/* Sales Chart - NEW */}
+                    <SalesChart
+                        data={salesChartData}
+                        period={selectedPeriod}
+                        onPeriodChange={setSelectedPeriod}
+                    />
 
-                    {/* Recent Vehicles */}
-                    <Card variant="glass">
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle className="flex items-center gap-2">
-                                <Car className="w-5 h-5 text-primary-400" />
-                                Veículos Recentes
-                            </CardTitle>
-                            <Link href="/vehicles">
-                                <Button variant="ghost" size="sm" rightIcon={<ArrowRight className="w-4 h-4" />}>
-                                    Ver todos
-                                </Button>
-                            </Link>
-                        </CardHeader>
-                        <CardContent>
-                            {recentVehicles.length > 0 ? (
-                                <div className="grid grid-cols-2 gap-3">
-                                    {recentVehicles.map(vehicle => (
-                                        <Link key={vehicle.id} href={`/vehicles/${vehicle.id}`}>
-                                            <div className="rounded-xl bg-gray-800/30 hover:bg-gray-800/50 transition-colors cursor-pointer overflow-hidden">
-                                                <div className="aspect-video bg-gray-700/50 flex items-center justify-center">
-                                                    {vehicle.images && vehicle.images.length > 0 ? (
-                                                        <img src={vehicle.images[0]} alt={`${vehicle.brand} ${vehicle.model}`} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <Car className="w-8 h-8 text-gray-500" />
-                                                    )}
-                                                </div>
-                                                <div className="p-3">
-                                                    <p className="font-medium text-sm truncate">{vehicle.brand} {vehicle.model}</p>
-                                                    <p className="text-xs text-success-400">R$ {formatPrice(vehicle.price)}</p>
-                                                </div>
-                                            </div>
-                                        </Link>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="text-center py-8">
-                                    <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-primary-500/10 flex items-center justify-center">
-                                        <Car className="w-7 h-7 text-primary-400" />
-                                    </div>
-                                    <p className="text-foreground-muted mb-4">Nenhum veículo cadastrado</p>
-                                    <Link href="/vehicles/new">
-                                        <Button size="sm">Adicionar veículo</Button>
-                                    </Link>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                    {/* Recent Leads */}
+                    <RecentLeads leads={recentLeads} />
                 </div>
 
-                {/* Right Column - Quick Actions & Stats */}
+                {/* Right Column - Vehicles & Stats */}
                 <div className="space-y-6">
+                    {/* Recent Vehicles */}
+                    <RecentVehicles vehicles={recentVehicles} />
+
                     {/* Quick Actions */}
                     <Card variant="glass">
                         <CardHeader>
@@ -436,21 +320,27 @@ export default function DashboardPage() {
                         </CardHeader>
                         <CardContent className="space-y-2">
                             <Link href="/vehicles/new">
-                                <div className="flex items-center gap-3 p-3 rounded-xl bg-primary-500/10 border border-primary-500/30 hover:bg-primary-500/20 transition-colors cursor-pointer">
-                                    <Car className="w-5 h-5 text-primary-400" />
-                                    <span className="font-medium">Cadastrar Veículo</span>
+                                <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-primary-500/10 hover:border-primary-500/30 transition-all cursor-pointer group">
+                                    <div className="p-2 rounded-lg bg-primary-500/20 group-hover:bg-primary-500/30 transition-colors">
+                                        <Car className="w-4 h-4 text-primary-400" />
+                                    </div>
+                                    <span className="font-medium group-hover:text-primary-400 transition-colors">Cadastrar Veículo</span>
                                 </div>
                             </Link>
                             <Link href="/leads/new">
-                                <div className="flex items-center gap-3 p-3 rounded-xl bg-success-500/10 border border-success-500/30 hover:bg-success-500/20 transition-colors cursor-pointer">
-                                    <Users className="w-5 h-5 text-success-400" />
-                                    <span className="font-medium">Cadastrar Lead</span>
+                                <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-success-500/10 hover:border-success-500/30 transition-all cursor-pointer group">
+                                    <div className="p-2 rounded-lg bg-success-500/20 group-hover:bg-success-500/30 transition-colors">
+                                        <Users className="w-4 h-4 text-success-400" />
+                                    </div>
+                                    <span className="font-medium group-hover:text-success-400 transition-colors">Cadastrar Lead</span>
                                 </div>
                             </Link>
                             <Link href="/sales/new">
-                                <div className="flex items-center gap-3 p-3 rounded-xl bg-warning-500/10 border border-warning-500/30 hover:bg-warning-500/20 transition-colors cursor-pointer">
-                                    <DollarSign className="w-5 h-5 text-warning-400" />
-                                    <span className="font-medium">Registrar Venda</span>
+                                <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-warning-500/10 hover:border-warning-500/30 transition-all cursor-pointer group">
+                                    <div className="p-2 rounded-lg bg-warning-500/20 group-hover:bg-warning-500/30 transition-colors">
+                                        <DollarSign className="w-4 h-4 text-warning-400" />
+                                    </div>
+                                    <span className="font-medium group-hover:text-warning-400 transition-colors">Registrar Venda</span>
                                 </div>
                             </Link>
                         </CardContent>
@@ -465,26 +355,26 @@ export default function DashboardPage() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-800/30">
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
                                 <span className="text-sm text-foreground-muted">Veículos vendidos</span>
                                 <span className="font-bold">{stats.salesThisMonth}</span>
                             </div>
-                            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-800/30">
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
                                 <span className="text-sm text-foreground-muted">Faturamento do mês</span>
                                 <span className="font-bold text-success-400">R$ {formatPrice(stats.revenueThisMonth)}</span>
                             </div>
-                            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-800/30">
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
                                 <span className="text-sm text-foreground-muted">Ticket médio</span>
                                 <span className="font-bold">
                                     R$ {stats.salesThisMonth > 0 ? formatPrice(stats.revenueThisMonth / stats.salesThisMonth) : '0'}
                                 </span>
                             </div>
-                            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-800/30">
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
                                 <span className="text-sm text-foreground-muted">Meta de conversão</span>
                                 <div className="flex items-center gap-2">
-                                    <div className="w-20 h-2 rounded-full bg-gray-700">
+                                    <div className="w-20 h-2 rounded-full bg-gray-700/50">
                                         <div
-                                            className="h-full rounded-full bg-gradient-to-r from-primary-500 to-success-500"
+                                            className="h-full rounded-full bg-gradient-to-r from-primary-500 to-success-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"
                                             style={{ width: `${Math.min(stats.conversionRate, 100)}%` }}
                                         ></div>
                                     </div>
@@ -495,9 +385,9 @@ export default function DashboardPage() {
                     </Card>
 
                     {/* Today's Date */}
-                    <Card className="bg-gradient-to-br from-gray-800/50 to-gray-900/50">
+                    <Card className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 border-white/5">
                         <CardContent className="p-4 text-center">
-                            <Calendar className="w-6 h-6 mx-auto mb-2 text-foreground-muted" />
+                            <Calendar className="w-6 h-6 mx-auto mb-2 text-foreground-muted opacity-50" />
                             <p className="text-lg font-bold">
                                 {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                             </p>

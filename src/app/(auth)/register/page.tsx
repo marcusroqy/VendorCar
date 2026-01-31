@@ -2,11 +2,30 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Car, Mail, User, Phone, ArrowLeft, CheckCircle } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Car, Mail, User, Phone, ArrowLeft, CheckCircle, Loader2, ShieldCheck } from 'lucide-react';
 import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui';
 import { createClient } from '@/lib/supabase/client';
+import { BotProtection } from '@/components/auth/BotProtection';
+import { formatPhone } from '@/lib/utils/format';
 
-// Google Icon Component
+// --- Validation Schema ---
+const registerSchema = z.object({
+    name: z.string().min(2, 'Nome muito curto (mínimo 2 letras)'),
+    email: z.string().email('Digite um email válido'),
+    phone: z.string().min(14, 'Telefone inválido').refine((val) => {
+        // Remove masked chars and check length (10 or 11 digits)
+        const digits = val.replace(/\D/g, '');
+        return digits.length >= 10 && digits.length <= 11;
+    }, 'Número de telefone incompleto'),
+    company_role: z.string().max(0, 'Bot detected'), // Honeypot trap
+});
+
+type RegisterFormData = z.infer<typeof registerSchema>;
+
+// --- Google Icon ---
 function GoogleIcon({ className }: { className?: string }) {
     return (
         <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -20,25 +39,89 @@ function GoogleIcon({ className }: { className?: string }) {
 
 export default function RegisterPage() {
     const [step, setStep] = useState<'form' | 'sent'>('form');
-    const [email, setEmail] = useState('');
-    const [name, setName] = useState('');
-    const [phone, setPhone] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-    const [error, setError] = useState('');
+    const [generalError, setGeneralError] = useState('');
 
-    const handleGoogleSignup = async () => {
-        setIsGoogleLoading(true);
-        setError('');
+    const {
+        register,
+        handleSubmit,
+        setValue,
+        watch,
+        formState: { errors, isSubmitting }
+    } = useForm<RegisterFormData>({
+        resolver: zodResolver(registerSchema),
+        defaultValues: {
+            name: '',
+            email: '',
+            phone: '',
+            company_role: '' // Honeypot start empty
+        }
+    });
+
+    // Real-time phone masking
+    const currentPhone = watch('phone');
+
+    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const rawValue = e.target.value;
+        const formatted = formatPhone(rawValue);
+        setValue('phone', formatted, { shouldValidate: true });
+    };
+
+    const onSubmit = async (data: RegisterFormData) => {
+        setGeneralError('');
+
+        // Honeypot check (redundant with Zod but explicitly safe)
+        if (data.company_role) {
+            console.warn('Bot detected via honeypot');
+            return;
+        }
 
         try {
             const supabase = createClient();
+            if (!supabase) throw new Error('Serviço indisponível');
 
-            if (!supabase) {
-                setError('Supabase não configurado');
-                setIsGoogleLoading(false);
-                return;
+            // Sign up with magic link
+            const { error: authError } = await supabase.auth.signInWithOtp({
+                email: data.email,
+                options: {
+                    emailRedirectTo: `${window.location.origin}/auth/callback?redirectTo=${encodeURIComponent('/update-password')}`,
+                    data: {
+                        full_name: data.name,
+                        phone: data.phone,
+                    }
+                },
+            });
+
+            if (authError) {
+                // Safely extract error message
+                let errorMsg = authError.message;
+                if (!errorMsg || errorMsg === '{}') {
+                    errorMsg = typeof authError === 'object' ? JSON.stringify(authError) : String(authError);
+                    if (errorMsg === '{}') errorMsg = "Erro desconhecido. Verifique se o email é válido.";
+                }
+
+                // Specific Resend/Supabase hints
+                if (errorMsg.includes("rate limit")) errorMsg = "Muitas tentativas. Aguarde um pouco.";
+                if (errorMsg.includes("Signups not allowed")) errorMsg = "Cadastros desativados temporariamente.";
+
+                setGeneralError(errorMsg);
+                console.error("Registration Error:", authError);
+            } else {
+                setStep('sent');
             }
+        } catch (err: any) {
+            console.error("Unexpected Error:", err);
+            setGeneralError(err.message || 'Erro ao criar conta. Tente novamente.');
+        }
+    };
+
+    const handleGoogleSignup = async () => {
+        setIsGoogleLoading(true);
+        setGeneralError('');
+
+        try {
+            const supabase = createClient();
+            if (!supabase) throw new Error('Serviço indisponível');
 
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
@@ -47,203 +130,201 @@ export default function RegisterPage() {
                 },
             });
 
-            if (error) {
-                setError(error.message);
-                setIsGoogleLoading(false);
-            }
-        } catch {
-            setError('Erro ao conectar com Google');
+            if (error) throw error;
+        } catch (err: any) {
+            setGeneralError(err.message || 'Erro ao conectar com Google');
             setIsGoogleLoading(false);
-        }
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        setIsLoading(true);
-
-        try {
-            const supabase = createClient();
-
-            if (!supabase) {
-                setError('Supabase não configurado');
-                setIsLoading(false);
-                return;
-            }
-
-            // Sign up with magic link
-            const { error } = await supabase.auth.signInWithOtp({
-                email,
-                options: {
-                    emailRedirectTo: `${window.location.origin}/auth/callback?type=signup`,
-                    data: {
-                        name,
-                        phone,
-                    },
-                },
-            });
-
-            if (error) {
-                setError(error.message);
-            } else {
-                setStep('sent');
-            }
-        } catch {
-            setError('Erro ao criar conta. Tente novamente.');
-        } finally {
-            setIsLoading(false);
         }
     };
 
     if (step === 'sent') {
         return (
-            <div className="animate-fade-in-up">
-                <div className="text-center mb-6">
-                    <Link href="/" className="inline-flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center">
-                            <Car className="w-6 h-6 text-white" />
-                        </div>
-                        <span className="font-bold text-xl">VendorCarro</span>
-                    </Link>
-                </div>
+            <div className="min-h-screen flex items-center justify-center p-4">
+                <div className="w-full max-w-md animate-fade-in-up">
+                    <div className="text-center mb-6">
+                        <Link href="/" className="inline-flex items-center gap-2">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center glow-primary">
+                                <Car className="w-6 h-6 text-white" />
+                            </div>
+                            <span className="font-bold text-xl tracking-tight">VendorCarro</span>
+                        </Link>
+                    </div>
 
-                <Card variant="glass">
-                    <CardContent className="pt-8 pb-8 text-center">
-                        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-success-500/10 flex items-center justify-center">
-                            <CheckCircle className="w-8 h-8 text-success-500" />
-                        </div>
-                        <h2 className="text-xl font-semibold mb-2">Verifique seu email</h2>
-                        <p className="text-foreground-muted mb-6">
-                            Enviamos um link de confirmação para<br />
-                            <span className="text-foreground font-medium">{email}</span>
-                        </p>
-                        <p className="text-sm text-foreground-subtle">
-                            Clique no link para ativar sua conta e começar a usar o VendorCarro.
-                        </p>
-                    </CardContent>
-                </Card>
+                    <Card variant="glass" className="border-primary-500/20 shadow-2xl shadow-primary-500/10">
+                        <CardContent className="pt-8 pb-8 text-center space-y-6">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-success-500/20 blur-xl rounded-full transform scale-150 opacity-50"></div>
+                                <div className="relative w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-success-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-success-500/20">
+                                    <CheckCircle className="w-10 h-10 text-white" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-success-400 to-emerald-400">
+                                    Verifique seu email
+                                </h2>
+                                <p className="text-foreground-muted text-lg">
+                                    Enviamos um link mágico para<br />
+                                    <span className="text-foreground font-semibold bg-white/5 py-1 px-3 rounded-lg mt-1 inline-block">
+                                        {watch('email')}
+                                    </span>
+                                </p>
+                            </div>
+
+                            <p className="text-sm text-foreground-subtle max-w-xs mx-auto">
+                                Clique no link para ativar sua conta segura e acessar o painel administrativo.
+                            </p>
+
+                            <Button
+                                variant="outline"
+                                onClick={() => setStep('form')}
+                                className="mt-4"
+                            >
+                                Voltar / Corrigir email
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="space-y-6 animate-fade-in-up">
-            {/* Logo */}
-            <div className="text-center">
-                <Link href="/" className="inline-flex items-center gap-2 mb-6">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center">
-                        <Car className="w-6 h-6 text-white" />
-                    </div>
-                    <span className="font-bold text-xl">VendorCarro</span>
-                </Link>
-            </div>
+        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+            {/* Background Decor */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-primary-500/10 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-[800px] h-[600px] bg-secondary-500/10 rounded-full blur-[100px] pointer-events-none" />
 
-            <Card variant="glass">
-                <CardHeader className="text-center">
-                    <CardTitle className="text-2xl">Criar conta grátis</CardTitle>
-                    <CardDescription>
-                        Comece a gerenciar seus veículos em minutos
-                    </CardDescription>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-                    {/* Google Signup Button */}
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        fullWidth
-                        leftIcon={<GoogleIcon className="w-5 h-5" />}
-                        onClick={handleGoogleSignup}
-                        isLoading={isGoogleLoading}
-                        disabled={isGoogleLoading}
-                    >
-                        Cadastrar com Google
-                    </Button>
-
-                    {/* Divider */}
-                    <div className="relative">
-                        <div className="absolute inset-0 flex items-center">
-                            <span className="w-full border-t border-gray-700" />
+            <div className="w-full max-w-md space-y-8 animate-fade-in-up relative z-10">
+                {/* Logo */}
+                <div className="text-center space-y-2">
+                    <Link href="/" className="inline-flex items-center gap-3 mb-2 group">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-500/20 group-hover:scale-105 transition-transform duration-300">
+                            <Car className="w-7 h-7 text-white" />
                         </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-gray-900 px-2 text-foreground-muted">ou</span>
-                        </div>
-                    </div>
+                        <span className="font-bold text-2xl tracking-tight text-white">VendorCarro</span>
+                    </Link>
+                </div>
 
-                    {/* Email Signup Form */}
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <Input
-                            type="text"
-                            label="Seu nome"
-                            placeholder="João Silva"
-                            leftIcon={<User className="w-5 h-5" />}
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            required
-                        />
+                <Card variant="glass" className="border-white/10 shadow-2xl backdrop-blur-md">
+                    <CardHeader className="text-center pb-2">
+                        <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+                            Criar conta profissional
+                        </CardTitle>
+                        <CardDescription className="text-base text-gray-400">
+                            Segurança de nível empresarial para sua loja
+                        </CardDescription>
+                    </CardHeader>
 
-                        <Input
-                            type="email"
-                            label="Email"
-                            placeholder="seu@email.com"
-                            leftIcon={<Mail className="w-5 h-5" />}
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                        />
-
-                        <Input
-                            type="tel"
-                            label="WhatsApp"
-                            placeholder="(11) 99999-9999"
-                            leftIcon={<Phone className="w-5 h-5" />}
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                            helperText="Usado para receber contatos de clientes"
-                            required
-                        />
-
-                        {error && (
-                            <p className="text-sm text-error-500">{error}</p>
-                        )}
-
+                    <CardContent className="space-y-6">
+                        {/* Google Button */}
                         <Button
-                            type="submit"
+                            type="button"
+                            variant="secondary"
                             fullWidth
-                            variant="outline"
-                            isLoading={isLoading}
-                            disabled={!email || !name || !phone || isLoading}
+                            leftIcon={isGoogleLoading ? <Loader2 className="animate-spin w-5 h-5" /> : <GoogleIcon className="w-5 h-5" />}
+                            onClick={handleGoogleSignup}
+                            isLoading={isGoogleLoading}
+                            disabled={isGoogleLoading || isSubmitting}
+                            className="h-12 bg-white text-gray-900 hover:bg-gray-100 border-0 font-medium transition-transform active:scale-[0.98]"
                         >
-                            Criar conta com email
+                            {isGoogleLoading ? 'Conectando...' : 'Cadastrar com Google'}
                         </Button>
-                    </form>
 
-                    <p className="text-xs text-foreground-subtle text-center">
-                        Ao criar sua conta, você concorda com nossos{' '}
-                        <a href="#" className="text-primary-400 hover:underline">Termos de Uso</a>
-                        {' '}e{' '}
-                        <a href="#" className="text-primary-400 hover:underline">Política de Privacidade</a>
-                    </p>
-                </CardContent>
+                        {/* Divider */}
+                        <div className="relative py-2">
+                            <div className="absolute inset-0 flex items-center">
+                                <span className="w-full border-t border-gray-800" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                                <span className="bg-[#0a0a0a] px-3 text-gray-500 font-medium">ou via email</span>
+                            </div>
+                        </div>
 
-                <CardFooter className="justify-center">
-                    <p className="text-sm text-foreground-muted">
-                        Já tem conta?{' '}
-                        <Link href="/login" className="text-primary-400 hover:underline">
-                            Entrar
-                        </Link>
-                    </p>
-                </CardFooter>
-            </Card>
+                        {/* Register Form */}
+                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                            {/* Honeypot Field */}
+                            <BotProtection {...register('company_role')} />
 
-            <div className="text-center">
-                <Link
-                    href="/"
-                    className="inline-flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground transition-colors"
-                >
-                    <ArrowLeft className="w-4 h-4" />
-                    Voltar para o início
-                </Link>
+                            <div className="space-y-1">
+                                <Input
+                                    {...register('name')}
+                                    label="Seu nome completo"
+                                    placeholder="Ex: João Silva"
+                                    leftIcon={<User className="w-5 h-5" />}
+                                    error={errors.name?.message}
+                                    className="bg-gray-900/50 border-gray-800 focus:border-primary-500/50 h-11"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <Input
+                                    {...register('email')}
+                                    type="email"
+                                    label="Email corporativo"
+                                    placeholder="seu@loja.com"
+                                    leftIcon={<Mail className="w-5 h-5" />}
+                                    error={errors.email?.message}
+                                    className="bg-gray-900/50 border-gray-800 focus:border-primary-500/50 h-11"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <Input
+                                    {...register('phone')}
+                                    onChange={handlePhoneChange}
+                                    label="WhatsApp / Celular"
+                                    placeholder="(11) 99999-9999"
+                                    leftIcon={<Phone className="w-5 h-5" />}
+                                    error={errors.phone?.message}
+                                    maxLength={15} // (11) 99999-9999
+                                    className="bg-gray-900/50 border-gray-800 focus:border-primary-500/50 h-11"
+                                />
+                                <p className="text-xs text-gray-500 ml-1">Usaremos para notificações de leads (opcional)</p>
+                            </div>
+
+                            {generalError && (
+                                <div className="p-3 rounded-lg bg-error-500/10 border border-error-500/20 text-error-400 text-sm flex items-center gap-2 animate-shake">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-error-400" />
+                                    {generalError}
+                                </div>
+                            )}
+
+                            <Button
+                                type="submit"
+                                fullWidth
+                                variant="primary"
+                                isLoading={isSubmitting}
+                                disabled={isSubmitting || isGoogleLoading}
+                                className="h-12 text-base font-semibold shadow-lg shadow-primary-500/25 transition-all hover:shadow-primary-500/40"
+                                leftIcon={!isSubmitting && <ShieldCheck className="w-5 h-5 opacity-70" />}
+                            >
+                                {isSubmitting ? 'Verificando dados...' : 'Criar Conta Segura'}
+                            </Button>
+
+                            <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                                <ShieldCheck className="w-3 h-3 text-green-500" />
+                                <span>Seus dados protegidos com criptografia de ponta a ponta</span>
+                            </div>
+                        </form>
+                    </CardContent>
+
+                    <CardFooter className="flex flex-col gap-4 border-t border-white/5 pt-6 bg-white/5">
+                        <p className="text-sm text-gray-400 text-center">
+                            Já possui cadastro?{' '}
+                            <Link href="/login" className="text-primary-400 font-medium hover:text-primary-300 transition-colors">
+                                Fazer Login
+                            </Link>
+                        </p>
+
+                        <p className="text-[10px] text-gray-600 text-center max-w-[280px] mx-auto leading-relaxed">
+                            Ao se cadastrar, você concorda com nossos{' '}
+                            <Link href="#" className="underline hover:text-gray-400">Termos de Uso</Link>
+                            {' '}e confirma que leu nossa{' '}
+                            <Link href="#" className="underline hover:text-gray-400">Política de Privacidade</Link>.
+                        </p>
+                    </CardFooter>
+                </Card>
             </div>
         </div>
     );
