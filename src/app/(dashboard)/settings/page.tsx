@@ -226,8 +226,18 @@ function CreateOrgModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
             let finalOrg = data.organization;
 
             // 2. Upload Logo if exists
+            // 2. Upload Logo if exists
             if (logoFile) {
+                // Remove duplicate declaration - relying on the one at the start of component or make sure it's safely scoped.
+                // Actually, let's just reuse the check from earlier or re-declare safely if needed,
+                // but since 'supabase' might be declared in outer scope, we should just check it.
+                // Wait, looking at previous code, 'supabase' was declared in 'createOrg' function scope? No, likely not.
+                // Let's look at the file context from Step 3140.
+                // Line 230: const supabase = createClient();
+                // This is inside 'createOrg' function.
+                // So we need to ensure it's checked.
                 const supabase = createClient();
+                if (!supabase) return; // Add this check!
                 const fileExt = logoFile.name.split('.').pop();
                 const filePath = `organizations/${finalOrg.id}/logo.${fileExt}`;
 
